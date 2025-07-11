@@ -9,7 +9,6 @@
       :root {
         background-color: #242424;
       }
-
       body {
         margin: 0;
         display: flex;
@@ -18,10 +17,14 @@
         min-height: 100dvh;
         overflow: hidden;
       }
+      canvas#output {
+        position: absolute;
+      }
     </style>
   </head>
   <body>
     <canvas id="scene" width="1024" height="768"></canvas>
+    <canvas id="output" width="1024" height="768"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1,26 +1,40 @@
-import { Device, Shaders } from "uwal";
+import { type LegacyRenderer, Device, Shaders } from "uwal";
 import Output from "./Output.wgsl?raw";
 
-// TODO: Fix this on UWAL's side:
-globalThis.devicePixelRatio = 1;
-
-export async function create(canvas: HTMLCanvasElement)
+export default class Scene
 {
-    const Renderer = new (await Device.RenderPipeline(canvas));
+    private Renderer!: LegacyRenderer;
+    private canvas!: HTMLCanvasElement;
 
-    Renderer.CreatePipeline(Renderer.CreateShaderModule([
-        Shaders.Resolution,
-        Shaders.Quad,
-        Output
-    ]));
+    public async create(canvas: HTMLCanvasElement): Promise<void>
+    {
+        this.Renderer = new (await Device.RenderPipeline(canvas)) as LegacyRenderer;
 
-    Renderer.SetBindGroups(
-        Renderer.CreateBindGroup(
-            Renderer.CreateBindGroupEntries(
-                Renderer.ResolutionBuffer
+        this.Renderer.CreatePipeline(this.Renderer.CreateShaderModule([
+            Shaders.Resolution,
+            Shaders.Quad,
+            Output
+        ]));
+
+        this.Renderer.SetBindGroups(
+            this.Renderer.CreateBindGroup(
+                this.Renderer.CreateBindGroupEntries(
+                    this.Renderer.ResolutionBuffer
+                )
             )
-        )
-    );
+        );
 
-    Renderer.Render(6);
+        this.Renderer.Render(6);
+    }
+
+    public resize(width: number, height: number): void
+    {
+        // Can't update style in an `OffscreenCanvas`:
+        this.Renderer.SetCanvasSize(width, height, false);
+    }
+
+    public set output(canvas: HTMLCanvasElement)
+    {
+        this.canvas = canvas;
+    }
 }
