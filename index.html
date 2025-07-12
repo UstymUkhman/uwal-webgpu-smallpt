@@ -7,6 +7,7 @@
     <title>Smallpt WebGPU</title>
     <style type="text/css">
       :root {
+        --maxCanvasWidth: 1024px;
         background-color: #242424;
       }
       body {
@@ -17,14 +18,21 @@
         min-height: 100dvh;
         overflow: hidden;
       }
+      canvas {
+        --maxWidth: min(var(--maxCanvasWidth), 100dvw);
+        --height: min(calc(var(--maxWidth) / 4 * 3), 100dvh);
+
+        width: round(down, calc(var(--height) / 3 * 4), 1px);
+        height: round(down, var(--height), 1px);
+      }
       canvas#output {
         position: absolute;
       }
     </style>
   </head>
   <body>
-    <canvas id="scene" width="1024" height="768"></canvas>
-    <canvas id="output" width="1024" height="768"></canvas>
+    <canvas id="scene"></canvas>
+    <canvas id="output"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
