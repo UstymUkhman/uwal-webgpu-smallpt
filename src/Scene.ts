@@ -1,40 +1,135 @@
-import { type LegacyRenderer, Device, Shaders } from "uwal";
+import type { Renderer, Computation } from "uwal";
+import Compute from "./Compute.wgsl?raw";
+import { Device, Shaders } from "uwal";
 import Output from "./Output.wgsl?raw";
 
 export default class Scene
 {
-    private Renderer!: LegacyRenderer;
+    private Renderer!: Renderer;
+    private Computation!: Computation;
     private canvas!: HTMLCanvasElement;
 
-    public async create(canvas: HTMLCanvasElement): Promise<void>
+    private storageBufferSize!: number;
+    private workgroupDimension!: number;
+
+    private resizeTimeout?: NodeJS.Timeout;
+    private color = { buffer: null, values: null };
+
+    private RenderPipeline!: InstanceType<Renderer["Pipeline"]>;
+    private ComputePipeline!: InstanceType<Computation["Pipeline"]>;
+
+    public constructor() { Device.OnLost = () => void 0; }
+
+    public setOutputCanvas(canvas: HTMLCanvasElement, width: number, height: number)
     {
-        this.Renderer = new (await Device.RenderPipeline(canvas)) as LegacyRenderer;
+        this.canvas = canvas;
+        const { devicePixelRatio } = globalThis;
+        this.canvas.width = width * devicePixelRatio | 0;
+        this.canvas.height = height * devicePixelRatio | 0;
+    }
 
-        this.Renderer.CreatePipeline(this.Renderer.CreateShaderModule([
-            Shaders.Resolution,
-            Shaders.Quad,
-            Output
-        ]));
+    public async create(canvas: HTMLCanvasElement, width: number, height: number): Promise<void>
+    {
+        this.storageBufferSize = width * height * 16;
+        await this.checkRequiredLimits(canvas);
 
-        this.Renderer.SetBindGroups(
-            this.Renderer.CreateBindGroup(
-                this.Renderer.CreateBindGroupEntries(
-                    this.Renderer.ResolutionBuffer
-                )
+        this.ComputePipeline = new this.Computation.Pipeline();
+        await this.Computation.AddPipeline(this.ComputePipeline, {
+            module: this.ComputePipeline.CreateShaderModule(Compute),
+            constants: { DIMENSION_SIZE: this.workgroupDimension }
+        });
+
+        this.Renderer = new (await Device.Renderer(canvas));
+        this.RenderPipeline = new this.Renderer.Pipeline();
+        // Can't update CSS style of an `OffscreenCanvas`:
+        this.Renderer.SetCanvasSize(width, height, false);
+
+        await this.Renderer.AddPipeline(this.RenderPipeline,
+            this.RenderPipeline.CreateShaderModule([
+                Shaders.Resolution,
+                Shaders.Quad,
+                Output
+            ])
+        );
+
+        this.createComputePipeline();
+        this.createRenderPipeline();
+    }
+
+    private async checkRequiredLimits(canvas: HTMLCanvasElement): Promise<void>
+    {
+        const storageBufferBindingSize = this.storageBufferSize * Uint32Array.BYTES_PER_ELEMENT * 3;
+        Device.RequiredLimits = { maxStorageBufferBindingSize: storageBufferBindingSize };
+        Device.SetRequiredFeatures("bgra8unorm-storage");
+
+        try
+        {
+            // Device request will fail if the adapter
+            // can't provide required limits specified above.
+            this.Computation = new (await Device.Computation());
+            this.workgroupDimension = this.Computation.GetMaxUniformWorkgroupSize(2);
+        }
+        catch (error)
+        {
+            this.create(canvas, 768, 576);
+            console.warn(error);
+
+            console.warn([
+                "Will be used a fallback with the minimum `maxStorageBufferBindingSize`",
+                "value available in all WebGPU contexts (134217728 bytes [128 MB]),",
+                "which produces a 768 x 576 pixel image."
+            ].join(" "));
+        }
+    }
+
+    private createComputePipeline(): void
+    {
+        const [width, height] = this.Renderer.CanvasSize;
+
+        this.color = this.ComputePipeline.CreateStorageBuffer(
+            "Values", this.storageBufferSize
+        );
+
+        this.ComputePipeline.SetBindGroups(
+            this.ComputePipeline.CreateBindGroup(
+                this.ComputePipeline.CreateBindGroupEntries([
+                    this.Renderer.ResolutionBuffer,
+                    this.color.buffer
+                ])
             )
         );
 
-        this.Renderer.Render(6);
+        this.Computation.Workgroups = [
+            Math.ceil(width / this.workgroupDimension),
+            Math.ceil(height / this.workgroupDimension)
+        ];
+    }
+
+    private createRenderPipeline(): void
+    {
+        this.RenderPipeline.SetBindGroups(
+            this.RenderPipeline.CreateBindGroup(
+                this.RenderPipeline.CreateBindGroupEntries([
+                    this.Renderer.ResolutionBuffer,
+                    this.color.buffer
+                ])
+            )
+        );
+
+        this.RenderPipeline.SetDrawParams(6);
+        this.Computation.Compute();
+        this.Renderer.Render();
     }
 
     public resize(width: number, height: number): void
     {
-        // Can't update style in an `OffscreenCanvas`:
-        this.Renderer.SetCanvasSize(width, height, false);
-    }
+        clearTimeout(this.resizeTimeout);
 
-    public set output(canvas: HTMLCanvasElement)
-    {
-        this.canvas = canvas;
+        this.resizeTimeout = setTimeout(() =>
+        {
+            Device.Destroy(this.color.buffer);
+            this.create(this.Renderer.Canvas, width, height);
+            this.setOutputCanvas(this.canvas, width, height);
+        }, 500);
     }
 }

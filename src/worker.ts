@@ -4,20 +4,20 @@ const scene = new Scene();
 
 self.onmessage = async ({ data }) =>
 {
+    const { width, height } = data;
+
     switch (data.action)
     {
         case "Transfer::WebGPU":
-            await scene.create(data.canvas);
-            self.postMessage({ action: "Resize::Window" });
+            await scene.create(data.canvas, width, height);
         break;
 
         case "Transfer::2D":
-            return scene.output = data.canvas;
+            return scene.setOutputCanvas(data.canvas, width, height);
 
         case "Resize::Window":
-            return scene.resize(data.width, data.height);
+            return scene.resize(width, height);
     }
-
 };
 
 self.onerror = console.error;
