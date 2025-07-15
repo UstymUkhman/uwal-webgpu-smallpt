@@ -28,7 +28,7 @@ export default class Scene
         this.canvas.height = height * devicePixelRatio | 0;
     }
 
-    public async create(canvas: HTMLCanvasElement, width: number, height: number): Promise<void>
+    public async create(canvas: HTMLCanvasElement, width: number, height: number): Promise<number[]>
     {
         this.storageBufferSize = width * height * 16;
         await this.checkRequiredLimits(canvas);
@@ -54,11 +54,12 @@ export default class Scene
 
         this.createComputePipeline();
         this.createRenderPipeline();
+        return [width, height];
     }
 
     private async checkRequiredLimits(canvas: HTMLCanvasElement): Promise<void>
     {
-        const storageBufferBindingSize = this.storageBufferSize * Uint32Array.BYTES_PER_ELEMENT * 3;
+        const storageBufferBindingSize = this.storageBufferSize * Uint32Array.BYTES_PER_ELEMENT * 4;
         Device.RequiredLimits = { maxStorageBufferBindingSize: storageBufferBindingSize };
         Device.SetRequiredFeatures("bgra8unorm-storage");
 
@@ -67,17 +68,17 @@ export default class Scene
             // Device request will fail if the adapter
             // can't provide required limits specified above.
             this.Computation = new (await Device.Computation());
-            this.workgroupDimension = this.Computation.GetMaxUniformWorkgroupSize(2);
+            this.workgroupDimension = this.Computation.GetMaxEvenWorkgroupDimension(2);
         }
         catch (error)
         {
-            this.create(canvas, 768, 576);
+            this.create(canvas, 832, 624);
             console.warn(error);
 
             console.warn([
                 "Will be used a fallback with the minimum `maxStorageBufferBindingSize`",
                 "value available in all WebGPU contexts (134217728 bytes [128 MB]),",
-                "which produces a 768 x 576 pixel image."
+                "which produces a 832 x 624 pixel image."
             ].join(" "));
         }
     }
@@ -87,7 +88,7 @@ export default class Scene
         const [width, height] = this.Renderer.CanvasSize;
 
         this.color = this.ComputePipeline.CreateStorageBuffer(
-            "Values", this.storageBufferSize
+            "values", this.storageBufferSize
         );
 
         this.ComputePipeline.SetBindGroups(

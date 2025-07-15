@@ -4,19 +4,20 @@ const scene = new Scene();
 
 self.onmessage = async ({ data }) =>
 {
-    const { width, height } = data;
+    const { width: canvasWidth, height: canvasHeight } = data;
 
     switch (data.action)
     {
         case "Transfer::WebGPU":
-            await scene.create(data.canvas, width, height);
+            const [width, height] = await scene.create(data.canvas, canvasWidth, canvasHeight);
+            (canvasWidth !== width || canvasHeight !== height) && self.postMessage({ width, height });
         break;
 
         case "Transfer::2D":
-            return scene.setOutputCanvas(data.canvas, width, height);
+            return scene.setOutputCanvas(data.canvas, canvasWidth, canvasHeight);
 
         case "Resize::Window":
-            return scene.resize(width, height);
+            return scene.resize(canvasWidth, canvasHeight);
     }
 };
 

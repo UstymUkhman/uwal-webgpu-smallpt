@@ -18,6 +18,10 @@ const worker = new Worker();
 worker.onerror = console.error;
 const [width, height] = resize(true);
 
+worker.onmessage = ({ data: { width } }) =>
+    // Force canvas size to match the minimum `maxStorageBufferBindingSize`:
+    document.documentElement.style.setProperty("--maxCanvasWidth", `${width}px`);
+
 const canvas2D = output.transferControlToOffscreen();
 const canvasWebGPU = scene.transferControlToOffscreen();
 addEventListener("resize", resize.bind(null, false), false);
