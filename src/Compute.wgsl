@@ -1,4 +1,29 @@
+var<private> rnd: vec3u;
+
 override DIMENSION_SIZE: u32 = 16;
+
+fn init_rnd(id: vec3u, seed: vec3u)
+{
+    const A = vec3(
+        1741651 * 1009,
+        140893 * 1609 * 13,
+        6521 * 983 * 7 * 2
+    );
+
+    rnd = (id * A) ^ seed;
+}
+
+fn rand() -> f32
+{
+    const C = vec3(
+        60493 * 9377,
+        11279 * 2539 * 23,
+        7919 * 631 * 5 * 3
+    );
+
+    rnd = (rnd * C) ^ (rnd.yzx >> vec3(4u));
+    return f32(rnd.x ^ rnd.y) / f32(0xffffffff);
+}
 
 @group(0) @binding(0) var<uniform> resolution: vec3f;
 @group(0) @binding(1) var<storage, read_write> values: array<vec4u>;
@@ -7,14 +32,11 @@ override DIMENSION_SIZE: u32 = 16;
 fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
 {
     let coord = vec2f(globalInvocation.xy);
-    let center = vec2f(resolution.xy) / 2;
-
-    let dist = distance(coord, center);
-    let white = dist / 32.0 % 2.0 < 1;
+    init_rnd(globalInvocation, vec3u(0));
 
     if (all(coord < resolution.xy))
     {
         let index = u32(coord.x + coord.y * resolution.x);
-        values[index] = select(vec4u(255, 0, 0, 255), vec4u(255), white);
+        values[index] = vec4u(vec3u(u32(rand() * 255)), 255);
     }
 }

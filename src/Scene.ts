@@ -1,11 +1,20 @@
-import type { Renderer, Computation } from "uwal";
 import Compute from "./Compute.wgsl?raw";
-import { Device, Shaders } from "uwal";
-import Output from "./Output.wgsl?raw";
+import Render from "./Render.wgsl?raw";
+
+import {
+    Device,
+    Shaders,
+    type Renderer,
+    type Computation,
+    type RenderPipeline,
+    type ComputePipeline
+} from "uwal";
 
 export default class Scene
 {
     private Renderer!: Renderer;
+    private color!: StorageBuffer;
+
     private Computation!: Computation;
     private canvas!: HTMLCanvasElement;
 
@@ -13,10 +22,8 @@ export default class Scene
     private workgroupDimension!: number;
 
     private resizeTimeout?: NodeJS.Timeout;
-    private color = { buffer: null, values: null };
-
-    private RenderPipeline!: InstanceType<Renderer["Pipeline"]>;
-    private ComputePipeline!: InstanceType<Computation["Pipeline"]>;
+    private RenderPipeline!: RenderPipeline;
+    private ComputePipeline!: ComputePipeline;
 
     public constructor() { Device.OnLost = () => void 0; }
 
@@ -41,6 +48,7 @@ export default class Scene
 
         this.Renderer = new (await Device.Renderer(canvas));
         this.RenderPipeline = new this.Renderer.Pipeline();
+
         // Can't update CSS style of an `OffscreenCanvas`:
         this.Renderer.SetCanvasSize(width, height, false);
 
@@ -48,7 +56,7 @@ export default class Scene
             this.RenderPipeline.CreateShaderModule([
                 Shaders.Resolution,
                 Shaders.Quad,
-                Output
+                Render
             ])
         );
 
@@ -101,8 +109,8 @@ export default class Scene
         );
 
         this.Computation.Workgroups = [
-            Math.ceil(width / this.workgroupDimension),
-            Math.ceil(height / this.workgroupDimension)
+            width / this.workgroupDimension,
+            height / this.workgroupDimension
         ];
     }
 

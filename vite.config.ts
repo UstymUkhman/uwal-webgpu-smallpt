@@ -4,5 +4,5 @@ export default defineConfig(
 {
     base: "./",
     build: { target: "esnext" },
-    worker: { format: 'es' }
+    worker: { format: "es" }
 });
