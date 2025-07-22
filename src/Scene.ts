@@ -22,8 +22,6 @@ export default class Scene
     private workgroupDimension!: number;
 
     private resizeTimeout?: NodeJS.Timeout;
-    private RenderPipeline!: RenderPipeline;
-    private ComputePipeline!: ComputePipeline;
 
     public constructor() { Device.OnLost = () => void 0; }
 
@@ -40,27 +38,11 @@ export default class Scene
         this.storageBufferSize = width * height * 16;
         await this.checkRequiredLimits(canvas);
 
-        this.ComputePipeline = new this.Computation.Pipeline();
-        await this.Computation.AddPipeline(this.ComputePipeline, {
-            module: this.ComputePipeline.CreateShaderModule(Compute),
-            constants: { DIMENSION_SIZE: this.workgroupDimension }
-        });
-
         this.Renderer = new (await Device.Renderer(canvas));
-        this.RenderPipeline = new this.Renderer.Pipeline();
-
         // Can't update CSS style of an `OffscreenCanvas`:
         this.Renderer.SetCanvasSize(width, height, false);
 
-        await this.Renderer.AddPipeline(this.RenderPipeline,
-            this.RenderPipeline.CreateShaderModule([
-                Shaders.Resolution,
-                Shaders.Quad,
-                Render
-            ])
-        );
-
-        this.createComputePipeline();
+        await this.createComputePipeline();
         this.createRenderPipeline();
         return [width, height];
     }
@@ -91,17 +73,29 @@ export default class Scene
         }
     }
 
-    private createComputePipeline(): void
+    private async createComputePipeline(): Promise<void>
     {
         const [width, height] = this.Renderer.CanvasSize;
+        const ComputePipeline: ComputePipeline = new this.Computation.Pipeline();
 
-        this.color = this.ComputePipeline.CreateStorageBuffer(
-            "values", this.storageBufferSize
-        );
+        await this.Computation.AddPipeline(ComputePipeline, {
+            constants: { DIMENSION_SIZE: this.workgroupDimension },
+            module: ComputePipeline.CreateShaderModule(Compute)
+        });
 
-        this.ComputePipeline.SetBindGroups(
-            this.ComputePipeline.CreateBindGroup(
-                this.ComputePipeline.CreateBindGroupEntries([
+        const { Xi, buffer: xiBuffer } =
+            ComputePipeline.CreateUniformBuffer("Xi") as UniformBuffer<"Xi", Uint32Array>;
+
+        this.color = ComputePipeline.CreateStorageBuffer("c", this.storageBufferSize);
+
+        Xi.forEach((_, i) => Xi[i] = Math.random() * 0xffffffff);
+
+        this.Computation.WriteBuffer(xiBuffer, Xi);
+
+        ComputePipeline.SetBindGroups(
+            ComputePipeline.CreateBindGroup(
+                ComputePipeline.CreateBindGroupEntries([
+                    xiBuffer,
                     this.Renderer.ResolutionBuffer,
                     this.color.buffer
                 ])
@@ -114,18 +108,28 @@ export default class Scene
         ];
     }
 
-    private createRenderPipeline(): void
+    private async createRenderPipeline(): Promise<void>
     {
-        this.RenderPipeline.SetBindGroups(
-            this.RenderPipeline.CreateBindGroup(
-                this.RenderPipeline.CreateBindGroupEntries([
+        const RenderPipeline: RenderPipeline = new this.Renderer.Pipeline();
+
+        await this.Renderer.AddPipeline(RenderPipeline,
+            RenderPipeline.CreateShaderModule([
+                Shaders.Resolution,
+                Shaders.Quad,
+                Render
+            ])
+        );
+
+        RenderPipeline.SetBindGroups(
+            RenderPipeline.CreateBindGroup(
+                RenderPipeline.CreateBindGroupEntries([
                     this.Renderer.ResolutionBuffer,
                     this.color.buffer
                 ])
             )
         );
 
-        this.RenderPipeline.SetDrawParams(6);
+        RenderPipeline.SetDrawParams(6);
         this.Computation.Compute();
         this.Renderer.Render();
     }

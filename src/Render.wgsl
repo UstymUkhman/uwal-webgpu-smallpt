@@ -1,10 +1,10 @@
 struct VertexOutput
 {
     @builtin(position) position: vec4f,
-    @location(1) @interpolate(flat) resolution: vec2u
+    @location(1) @interpolate(flat) res: vec2u
 };
 
-@group(0) @binding(1) var<storage, read_write> values: array<vec4u>;
+@group(0) @binding(1) var<storage, read_write> c: array<vec4u>;
 
 @vertex fn vertex(@builtin(vertex_index) index: u32) -> VertexOutput
 {
@@ -12,21 +12,21 @@ struct VertexOutput
     let position = GetQuadCoord(index);
 
     output.position = vec4f(position, 0, 1);
-    output.resolution = vec2u(resolution.xy);
+    output.res = vec2u(resolution.xy);
 
     return output;
 }
 
 @fragment fn fragment(
     @builtin(position) position: vec4f,
-    @location(1) @interpolate(flat) resolution: vec2u
+    @location(1) @interpolate(flat) res: vec2u
 ) -> @location(0) vec4f
 {
     let pos = vec2u(position.xy);
 
-    let x = pos.x % resolution.x;
-    let y = pos.y % resolution.y;
-    let i = x + y * resolution.x;
+    let x = pos.x % res.x;
+    let y = pos.y % res.y;
+    let i = x + y * res.x;
 
-    return vec4f(values[i] / 255);
+    return vec4f(c[i]) / 255;
 }
