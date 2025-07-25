@@ -1,8 +1,13 @@
-import type { Renderer, Computation } from "uwal";
 import Compute from "./Compute.wgsl?raw";
 import Render from "./Render.wgsl?raw";
-import { Device, Shaders } from "uwal";
 enum Material { DIFF, SPEC, REFR };
+
+import {
+    Device,
+    Shaders,
+    type Renderer,
+    type Computation
+} from "uwal";
 
 export default class Scene
 {
@@ -69,8 +74,8 @@ export default class Scene
 
     private async createComputePipeline(): Promise<void>
     {
-        const sphereObjects = this.createSpheres();
         const [width, height] = this.Renderer.CanvasSize;
+        const sphereObjects = this.createSpheres().reverse();
         const ComputePipeline = new this.Computation.Pipeline();
 
         await this.Computation.AddPipeline(ComputePipeline, {
@@ -81,8 +86,8 @@ export default class Scene
             `)
         });
 
-        const { Xi, buffer: xiBuffer } =
-            ComputePipeline.CreateUniformBuffer("Xi") as UniformBuffer<"Xi", Uint32Array>;
+        const { seed, buffer: seedBuffer } =
+            ComputePipeline.CreateUniformBuffer("seed") as UniformBuffer<"seed", Uint32Array>;
 
         this.color = ComputePipeline.CreateStorageBuffer("color", this.storageBufferSize);
 
@@ -100,16 +105,17 @@ export default class Scene
 
         this.Computation.WriteBuffer(spheresBuffer, spheres[0].p.buffer);
 
-        Xi.forEach((_, i) => Xi[i] = Math.random() * 0xffffffff);
+        seed.forEach((_, s) => seed[s] = Math.random() * 0xffffffff);
 
-        this.Computation.WriteBuffer(xiBuffer, Xi);
+        this.Computation.WriteBuffer(seedBuffer, seed);
 
         ComputePipeline.SetBindGroups(
             ComputePipeline.CreateBindGroup(
                 ComputePipeline.CreateBindGroupEntries([
-                    xiBuffer,
                     this.Renderer.ResolutionBuffer,
-                    this.color.buffer
+                    seedBuffer,
+                    this.color.buffer,
+                    spheresBuffer
                 ])
             )
         );
@@ -214,6 +220,12 @@ export default class Scene
             e: [12, 12, 12],
             refl: Material.DIFF,
             c: [0, 0, 0]
-        }];
+        } /*, {
+            p: [50, 81.6 - 16.5, 81.6],
+            rad: 1.5,
+            e: [400, 400, 400],
+            refl: Material.DIFF,
+            c: [0, 0, 0]
+        } */];
     }
 }
