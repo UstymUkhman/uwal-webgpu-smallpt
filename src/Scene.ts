@@ -74,8 +74,8 @@ export default class Scene
 
     private async createComputePipeline(): Promise<void>
     {
+        const sphereObjects = this.createSpheres();
         const [width, height] = this.Renderer.CanvasSize;
-        const sphereObjects = this.createSpheres().reverse();
         const ComputePipeline = new this.Computation.Pipeline();
 
         await this.Computation.AddPipeline(ComputePipeline, {
@@ -168,63 +168,63 @@ export default class Scene
     {
         return [{
             p: [1e5 + 1, 40.8, 81.6],
-            rad: 1e5,
+            rad: [1e5],
             e: [0, 0, 0],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0.75, 0.25, 0.25]
         }, {
             p: [-1e5 + 99, 40.8, 81.6],
-            rad: 1e5,
+            rad: [1e5],
             e: [0, 0, 0],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0.25, 0.25, 0.75]
         }, {
             p: [50, 40.8, 1e5],
-            rad: 1e5,
+            rad: [1e5],
             e: [0, 0, 0],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0.75, 0.75, 0.75]
         }, {
             p: [50, 40.8, -1e5 + 170],
-            rad: 1e5,
+            rad: [1e5],
             e: [0, 0, 0],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0, 0, 0]
         }, {
             p: [50, 1e5, 81.6],
-            rad: 1e5,
+            rad: [1e5],
             e: [0, 0, 0],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0.75, 0.75, 0.75]
         }, {
             p: [50, -1e5 + 81.6, 81.6],
-            rad: 1e5,
+            rad: [1e5],
             e: [0, 0, 0],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0.75, 0.75, 0.75]
         }, {
             p: [27, 16.5, 47],
-            rad: 16.5,
+            rad: [16.5],
             e: [0, 0, 0],
-            refl: Material.SPEC,
+            refl: [Material.SPEC],
             c: [0.999, 0.999, 0.999]
         }, {
             p: [73, 16.5, 78],
-            rad: 16.5,
+            rad: [16.5],
             e: [0, 0, 0],
-            refl: Material.REFR,
+            refl: [Material.REFR],
             c: [0.999, 0.999, 0.999]
         }, {
             p: [50, 681.6 - 0.27, 81.6],
-            rad: 600,
+            rad: [600],
             e: [12, 12, 12],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0, 0, 0]
         } /*, {
             p: [50, 81.6 - 16.5, 81.6],
-            rad: 1.5,
+            rad: [1.5],
             e: [400, 400, 400],
-            refl: Material.DIFF,
+            refl: [Material.DIFF],
             c: [0, 0, 0]
         } */];
     }

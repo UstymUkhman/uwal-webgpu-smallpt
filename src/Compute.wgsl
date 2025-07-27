@@ -92,7 +92,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
     var cl = vec3f(0);
     var cf = vec3f(1);
 
-    while (true)
+    loop
     {
         if (!intersect(r, &t, &id))
         { return cl; }
@@ -127,7 +127,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
             let r2s = sqrt(r2);
 
             let w = nl;
-            let u = normalize(cross(select(vec3f(1), vec3f(0, 1, 0), abs(w.x) > 0.1), w));
+            let u = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(w.x) > 0.1), w));
 
             let v = cross(w, u);
             let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));
@@ -181,8 +181,6 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 
         continue;
     }
-
-    return cl;
 }
 
 @group(0) @binding(0) var<uniform> res: vec3f;
@@ -198,19 +196,16 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
 
     if (all(coord < res.xy))
     {
-        let x = coord.x / res.x;
-        let y = coord.y / res.y;
-
         let cam = Ray(
             vec3f(50, 52, 295.6),
             normalize(vec3f(0, -0.042612, -1))
         );
 
-        let i = u32(coord.x + (res.y - coord.y) * res.x);
-        var c = vec3f(vec3f(color[i].rgb) / 255);
-
-        let cx = vec3f(res.x * 0.5135 / res.y);
+        let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);
         let cy = normalize(cross(cx, cam.d)) * 0.5135;
+
+        let i = u32(coord.x + (res.y - coord.y) * res.x);
+        var c = vec3f(color[i].rgb) / 255;
 
         for (var sy = 0u; sy < 2; sy++)
         {
@@ -222,11 +217,11 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
                 let dx = select(1 - sqrt(2 - r1), sqrt(r1) - 1, r1 < 1);
                 let dy = select(1 - sqrt(2 - r2), sqrt(r2) - 1, r2 < 1);
 
-                var d = cx * (((f32(sx) + 0.5 + dx) / 2 + x) / res.x - 0.5) +
-                        cy * (((f32(sy) + 0.5 + dy) / 2 + y) / res.y - 0.5) + cam.d;
+                var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +
+                        cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;
 
-                let ray = radiance(Ray(cam.o + d * 140, normalize(d)), 0);
-                c += clamp(ray, vec3f(0), vec3f(1)) * 0.25;
+                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0); // * (1./samps);
+                c += clamp(r, vec3f(0), vec3f(1)) * 0.25;
             }
         }
 
