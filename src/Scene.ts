@@ -21,6 +21,10 @@ export default class Scene
     private workgroupDimension!: number;
 
     private resizeTimeout?: NodeJS.Timeout;
+    private seedAndSampsBuffer!: GPUBuffer;
+
+    private readonly draw = this.render.bind(this);
+    private seedAndSamps!: Uint32Array<ArrayBuffer>;
 
     public constructor() { Device.OnLost = () => void 0; }
 
@@ -42,7 +46,9 @@ export default class Scene
         this.Renderer.SetCanvasSize(width, height, false);
 
         await this.createComputePipeline();
-        this.createRenderPipeline();
+        await this.createRenderPipeline();
+        requestAnimationFrame(this.draw);
+
         return [width, height];
     }
 
@@ -86,9 +92,6 @@ export default class Scene
             `)
         });
 
-        const { seed, buffer: seedBuffer } =
-            ComputePipeline.CreateUniformBuffer("seed") as UniformBuffer<"seed", Uint32Array>;
-
         this.color = ComputePipeline.CreateStorageBuffer("color", this.storageBufferSize);
 
         const { spheres, buffer: spheresBuffer } =
@@ -105,15 +108,18 @@ export default class Scene
 
         this.Computation.WriteBuffer(spheresBuffer, spheres[0].p.buffer);
 
-        seed.forEach((_, s) => seed[s] = Math.random() * 0xffffffff);
+        const { seedAndSamps, buffer: seedAndSampsBuffer } =
+            ComputePipeline.CreateUniformBuffer("seedAndSamps") as
+            UniformBuffer<"seedAndSamps", Uint32Array>;
 
-        this.Computation.WriteBuffer(seedBuffer, seed);
+        this.seedAndSampsBuffer = seedAndSampsBuffer;
+        this.seedAndSamps = seedAndSamps;
 
         ComputePipeline.SetBindGroups(
             ComputePipeline.CreateBindGroup(
                 ComputePipeline.CreateBindGroupEntries([
                     this.Renderer.ResolutionBuffer,
-                    seedBuffer,
+                    seedAndSampsBuffer,
                     this.color.buffer,
                     spheresBuffer
                 ])
@@ -148,8 +154,26 @@ export default class Scene
         );
 
         RenderPipeline.SetDrawParams(6);
+    }
+
+    private updateSeedAndSampsBuffer(): void
+    {
+        this.seedAndSamps[0] = Math.random() * 0xffffffff;
+        this.seedAndSamps[1] = Math.random() * 0xffffffff;
+        this.seedAndSamps[2] = Math.random() * 0xffffffff;
+        this.seedAndSamps[3]++; /* Total samples count */
+
+        this.Computation.WriteBuffer(this.seedAndSampsBuffer, this.seedAndSamps);
+    }
+
+    private render(): void
+    {
+        this.updateSeedAndSampsBuffer();
         this.Computation.Compute();
         this.Renderer.Render();
+
+        if (this.seedAndSamps[3] < 1e3)
+            requestAnimationFrame(this.draw);
     }
 
     public resize(width: number, height: number): void
@@ -167,38 +191,38 @@ export default class Scene
     private createSpheres(): Sphere[]
     {
         return [{
-            p: [1e5 + 1, 40.8, 81.6],
-            rad: [1e5],
+            p: [1e3 - 2, 40.8, 81.6],
+            rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
             c: [0.75, 0.25, 0.25]
         }, {
-            p: [-1e5 + 99, 40.8, 81.6],
-            rad: [1e5],
+            p: [-1e3 + 102, 40.8, 81.6],
+            rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
             c: [0.25, 0.25, 0.75]
         }, {
-            p: [50, 40.8, 1e5],
-            rad: [1e5],
+            p: [50, 40.8, 1e3],
+            rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
             c: [0.75, 0.75, 0.75]
         }, {
-            p: [50, 40.8, -1e5 + 170],
-            rad: [1e5],
+            p: [50, 40.8, -1e3 + 170],
+            rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
             c: [0, 0, 0]
         }, {
-            p: [50, 1e5, 81.6],
-            rad: [1e5],
+            p: [50, 1e3, 81.6],
+            rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
             c: [0.75, 0.75, 0.75]
         }, {
-            p: [50, -1e5 + 81.6, 81.6],
-            rad: [1e5],
+            p: [50, -1e3 + 81.6 + 4.2, 81.6],
+            rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
             c: [0.75, 0.75, 0.75]
@@ -215,13 +239,13 @@ export default class Scene
             refl: [Material.REFR],
             c: [0.999, 0.999, 0.999]
         }, {
-            p: [50, 681.6 - 0.27, 81.6],
+            p: [50, 681.6 - 0.27 + 3.4, 81.6 - 42],
             rad: [600],
             e: [12, 12, 12],
             refl: [Material.DIFF],
             c: [0, 0, 0]
         } /*, {
-            p: [50, 81.6 - 16.5, 81.6],
+            p: [50, 81.6 - 16.5 - 0.3, 81.6 - 42],
             rad: [1.5],
             e: [400, 400, 400],
             refl: [Material.DIFF],

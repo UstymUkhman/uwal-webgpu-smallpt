@@ -155,7 +155,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
             continue;
         }
 
-        let tdir = normalize(r.d * nnt - n * select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t)));
+        let tdir = normalize(r.d * nnt - n * (select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t))));
 
         let a = nt - nc;
         let b = nt + nc;
@@ -184,7 +184,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 }
 
 @group(0) @binding(0) var<uniform> res: vec3f;
-@group(0) @binding(1) var<uniform> seed: vec3u;
+@group(0) @binding(1) var<uniform> seedAndSamps: vec4u;
 @group(0) @binding(2) var<storage, read_write> color: array<vec4u>;
 @group(0) @binding(3) var<storage, read> spheres: array<Sphere, SPHERES>;
 
@@ -192,7 +192,6 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
 {
     let coord = vec2f(globalInvocation.xy);
-    init_rnd(globalInvocation, seed);
 
     if (all(coord < res.xy))
     {
@@ -200,6 +199,8 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
             vec3f(50, 52, 295.6),
             normalize(vec3f(0, -0.042612, -1))
         );
+
+        init_rnd(globalInvocation, seedAndSamps.xyz);
 
         let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);
         let cy = normalize(cross(cx, cam.d)) * 0.5135;
@@ -220,11 +221,11 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
                 var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +
                         cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;
 
-                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0); // * (1./samps);
+                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * (1 / 1e3);
                 c += clamp(r, vec3f(0), vec3f(1)) * 0.25;
             }
         }
 
-        color[i] = vec4u(vec3u(pow(clamp(c, vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5), 255);
+        color[i] = vec4u(vec3u(pow(clamp(c, vec3f(0), vec3f(1)), /* GAMMA */ vec3f(1)) * 255 + 0.5), 255);
     }
 }
