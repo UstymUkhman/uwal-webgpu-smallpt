@@ -9,6 +9,7 @@ const REFR: Refl_t = 2;
 const PI = radians(180);
 var<private> rnd: vec3u;
 
+override SAMPLES: f32 = 1.0;
 const GAMMA = vec3f(1 / 2.2);
 override DIMENSION_SIZE = 16u;
 
@@ -184,14 +185,16 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 }
 
 @group(0) @binding(0) var<uniform> res: vec3f;
-@group(0) @binding(1) var<uniform> seedAndSamps: vec4u;
-@group(0) @binding(2) var<storage, read_write> color: array<vec4u>;
-@group(0) @binding(3) var<storage, read> spheres: array<Sphere, SPHERES>;
+@group(0) @binding(1) var<uniform> seed: vec3u;
+@group(0) @binding(2) var<storage, read_write> c3f: array<vec3f>;
+@group(0) @binding(3) var<storage, read_write> c4u: array<vec4u>;
+@group(0) @binding(4) var<storage, read> spheres: array<Sphere, SPHERES>;
 
 @compute @workgroup_size(DIMENSION_SIZE, DIMENSION_SIZE)
 fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
 {
     let coord = vec2f(globalInvocation.xy);
+    init_rnd(globalInvocation, seed);
 
     if (all(coord < res.xy))
     {
@@ -200,13 +203,9 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
             normalize(vec3f(0, -0.042612, -1))
         );
 
-        init_rnd(globalInvocation, seedAndSamps.xyz);
-
         let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);
         let cy = normalize(cross(cx, cam.d)) * 0.5135;
-
         let i = u32(coord.x + (res.y - coord.y) * res.x);
-        var c = vec3f(color[i].rgb) / 255;
 
         for (var sy = 0u; sy < 2; sy++)
         {
@@ -221,11 +220,11 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
                 var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +
                         cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;
 
-                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * (1 / 1e3);
-                c += clamp(r, vec3f(0), vec3f(1)) * 0.25;
+                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * SAMPLES;
+                c3f[i] = c3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;
             }
         }
 
-        color[i] = vec4u(vec3u(pow(clamp(c, vec3f(0), vec3f(1)), /* GAMMA */ vec3f(1)) * 255 + 0.5), 255);
+        c4u[i] = vec4u(vec3u(pow(clamp(c3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5), 255);
     }
 }

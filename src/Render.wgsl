@@ -4,7 +4,7 @@ struct VertexOutput
     @location(1) @interpolate(flat) res: vec2u
 };
 
-@group(0) @binding(1) var<storage, read_write> color: array<vec4u>;
+@group(0) @binding(1) var<storage, read_write> c4u: array<vec4u>;
 
 @vertex fn vertex(@builtin(vertex_index) index: u32) -> VertexOutput
 {
@@ -28,5 +28,5 @@ struct VertexOutput
     let y = pos.y % res.y;
     let i = x + y * res.x;
 
-    return vec4f(color[i]) / 255;
+    return vec4f(c4u[i]) / 255;
 }
