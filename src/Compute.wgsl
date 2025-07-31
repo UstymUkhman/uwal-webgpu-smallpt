@@ -64,11 +64,11 @@ fn intersect_sphere(s: Sphere, r: Ray) -> f32
     }
 }
 
-fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, u32>) -> bool
+fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool
 {
     *t = INF;
 
-    for (var s = 0u; s < SPHERES; s++)
+    for (var s = i32(SPHERES - 1); s > -1; s--)
     {
         let d = intersect_sphere(spheres[s], r);
 
@@ -85,7 +85,7 @@ fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, u32>) -> bool
 fn radiance(ray: Ray, depth: u32) -> vec3f
 {
     var t: f32;
-    var id = 0u;
+    var id = 0;
 
     var r = ray;
     var d = depth;
@@ -105,11 +105,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
         let nl = select(-n, n, dot(n, r.d) < 0);
         var f = obj.c;
 
-        let p = select(
-            select(f.z, f.y, f.y > f.z),
-            f.x, f.x > f.y && f.x > f.z
-        );
-
+        let p = max(max(f.x, f.y), f.z);
         cl += cf * obj.e;
         d++;
 
@@ -144,10 +140,12 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 
         let reflRay = Ray(x, r.d - n * 2 * dot(n, r.d));
         let into = dot(n, nl) > 0;
+
         let nc = 1f;
         let nt = 1.5;
         let nnt = select(nt / nc, nc / nt, into);
         let ddn = dot(r.d, nl);
+
         let cos2t = 1 - nnt * nnt * (1 - ddn * ddn);
 
         if (cos2t < 0)
@@ -156,7 +154,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
             continue;
         }
 
-        let tdir = normalize(r.d * nnt - n * (select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t))));
+        let tdir = normalize(r.d * nnt - n * select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t)));
 
         let a = nt - nc;
         let b = nt + nc;
@@ -186,8 +184,8 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 
 @group(0) @binding(0) var<uniform> res: vec3f;
 @group(0) @binding(1) var<uniform> seed: vec3u;
-@group(0) @binding(2) var<storage, read_write> c3f: array<vec3f>;
-@group(0) @binding(3) var<storage, read_write> c4u: array<vec4u>;
+@group(0) @binding(2) var<storage, read_write> color3f: array<vec3f>;
+@group(0) @binding(3) var<storage, read_write> color4u: array<vec4u>;
 @group(0) @binding(4) var<storage, read> spheres: array<Sphere, SPHERES>;
 
 @compute @workgroup_size(DIMENSION_SIZE, DIMENSION_SIZE)
@@ -203,9 +201,11 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
             normalize(vec3f(0, -0.042612, -1))
         );
 
+        let iy = res.y - coord.y - 1;
+        let i = u32(coord.x + iy * res.x);
+
         let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);
         let cy = normalize(cross(cx, cam.d)) * 0.5135;
-        let i = u32(coord.x + (res.y - coord.y) * res.x);
 
         for (var sy = 0u; sy < 2; sy++)
         {
@@ -221,10 +221,12 @@ fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
                         cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;
 
                 let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * SAMPLES;
-                c3f[i] = c3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;
+                color3f[i] = color3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;
             }
         }
 
-        c4u[i] = vec4u(vec3u(pow(clamp(c3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5), 255);
+        color4u[i] = vec4u(vec3u(
+            pow(clamp(color3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5
+        ), 255);
     }
 }

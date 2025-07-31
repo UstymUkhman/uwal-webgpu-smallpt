@@ -11,12 +11,12 @@ import {
 
 export default class Scene
 {
-    private c3f!: StorageBuffer;
-    private c4u!: StorageBuffer;
+    private sampsCount = 0.0;
     private Renderer!: Renderer;
-
-    private sampsCount: number = 0;
     private seedBuffer!: GPUBuffer;
+
+    private color3f!: StorageBuffer;
+    private color4u!: StorageBuffer;
     private readonly totSamps = 5e3;
 
     private Computation!: Computation;
@@ -104,8 +104,8 @@ export default class Scene
         const { seed, buffer: seedBuffer } =
             ComputePipeline.CreateUniformBuffer("seed") as UniformBuffer<"seed", Uint32Array>;
 
-        this.c3f = ComputePipeline.CreateStorageBuffer("c3f", this.storageBufferSize * 0.75);
-        this.c4u = ComputePipeline.CreateStorageBuffer("c4u", this.storageBufferSize);
+        this.color3f = ComputePipeline.CreateStorageBuffer("color3f", this.storageBufferSize * 0.75);
+        this.color4u = ComputePipeline.CreateStorageBuffer("color4u", this.storageBufferSize);
 
         const { spheres, buffer: spheresBuffer } =
             ComputePipeline.CreateStorageBuffer("spheres", sphereObjects.length);
@@ -128,8 +128,8 @@ export default class Scene
                 ComputePipeline.CreateBindGroupEntries([
                     this.Renderer.ResolutionBuffer,
                     this.seedBuffer,
-                    this.c3f.buffer,
-                    this.c4u.buffer,
+                    this.color3f.buffer,
+                    this.color4u.buffer,
                     spheresBuffer
                 ])
             )
@@ -157,7 +157,7 @@ export default class Scene
             RenderPipeline.CreateBindGroup(
                 RenderPipeline.CreateBindGroupEntries([
                     this.Renderer.ResolutionBuffer,
-                    this.c4u.buffer
+                    this.color4u.buffer
                 ])
             )
         );
@@ -190,7 +190,7 @@ export default class Scene
 
         this.resizeTimeout = setTimeout(() =>
         {
-            Device.Destroy([this.c3f.buffer, this.c4u.buffer]);
+            Device.Destroy([this.color3f.buffer, this.color4u.buffer]);
             this.create(this.Renderer.Canvas, width, height);
             this.setOutputCanvas(this.canvas, width, height);
         }, 500);
@@ -215,7 +215,7 @@ export default class Scene
             rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
-            c: [0.8, 0.8, 0.8]
+            c: [0.2, 0.8, 0.2]
         }, {
             p: [50, 40.8, -1e3 + 170],
             rad: [1e3],
@@ -249,8 +249,7 @@ export default class Scene
         }, {
             p: [50, 68.16 - 0.27 + 74.2, 81.6],
             rad: [60],
-            e: [9, 9, 9],
-            // e: [12, 12, 12],
+            e: [12, 12, 12],
             refl: [Material.DIFF],
             c: [0, 0, 0]
         } /*, {

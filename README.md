@@ -4,11 +4,11 @@ _WebGPU port of **smallpt**: Global Illumination in 99 lines of C++ by [Kevin Be
 
 # Introduction
 
-Original source code was found [here](https://www.kevinbeason.com/smallpt/) and ported to the web using TypeScript and WebGPU. Actually, this version is loosely based on two modifications of the original algorithm. The first one is called "explicit.cpp" which can be found [here](./src/explicit.cpp) and, as its description specifies, is a
+Original source code was found [here](https://www.kevinbeason.com/smallpt/) and ported to the web using TypeScript and WebGPU. Actually, this version is loosely based on two modifications of the original algorithm. The first one is called "explicit.cpp" which can be found [here](https://www.kevinbeason.com/smallpt/explicit.cpp) and, as its description specifies, is a
 
 > Huge speedup, especially for small lights. Adds explicit light sampling with 23 additional lines of code and a small function signature change. Produces [this image](https://www.kevinbeason.com/smallpt/explicit16.png) in 10 seconds on a Intel Core i7 920 quad-core CPU using 16 samples per pixel.
 
-The second one is called "[forward.cpp](./src/forward.cpp)" and it's a
+The second one is called "[forward.cpp](https://www.kevinbeason.com/smallpt/forward.cpp)" and it's a
 
 > Revision of `radiance()` function that removes all recursion and uses only a simple loop and no path branching. That is, the ray tree is always one ray wide.
 
