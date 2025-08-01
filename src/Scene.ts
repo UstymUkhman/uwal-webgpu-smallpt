@@ -1,3 +1,4 @@
+import { type UNet, initUNetFromURL } from "oidn-web";
 import Compute from "./Compute.wgsl?raw";
 import Render from "./Render.wgsl?raw";
 enum Material { DIFF, SPEC, REFR };
@@ -11,39 +12,61 @@ import {
 
 export default class Scene
 {
-    private sampsCount = 0.0;
+    private unet!: UNet;
+    private sampsCount = 0;
+    private image!: ImageData;
     private Renderer!: Renderer;
-    private seedBuffer!: GPUBuffer;
 
+    private seedBuffer!: GPUBuffer;
     private color3f!: StorageBuffer;
     private color4u!: StorageBuffer;
     private readonly totSamps = 5e3;
 
     private Computation!: Computation;
     private canvas!: HTMLCanvasElement;
+    private denoiserBuffer!: GPUBuffer;
 
+    private readonly denoiserFreq = 25;
     private storageBufferSize!: number;
     private workgroupDimension!: number;
 
     private resizeTimeout?: NodeJS.Timeout;
     private seed!: Uint32Array<ArrayBuffer>;
 
+    private context!: CanvasRenderingContext2D;
     private readonly draw = this.render.bind(this);
     private readonly quartSamps = this.totSamps / 4;
 
-    public constructor() { Device.OnLost = () => void 0; }
+    public constructor()
+    {
+        Device.OnLost = () => void 0;
+        initUNetFromURL("/rt_ldr.tza").then(unet => this.unet = unet);
+    }
+
+    public resize(width: number, height: number): void
+    {
+        clearTimeout(this.resizeTimeout);
+
+        this.resizeTimeout = setTimeout(() =>
+        {
+            Device.Destroy([this.color3f.buffer, this.color4u.buffer]);
+            this.create(this.Renderer.Canvas, width, height);
+            this.setOutputCanvas(this.canvas, width, height);
+        }, 500);
+    }
 
     public setOutputCanvas(canvas: HTMLCanvasElement, width: number, height: number)
     {
         this.canvas = canvas;
-        const { devicePixelRatio } = globalThis;
-        this.canvas.width = width * devicePixelRatio | 0;
-        this.canvas.height = height * devicePixelRatio | 0;
+        this.context = canvas.getContext("2d")!;
+        this.canvas.width = width; this.canvas.height = height;
+        this.image = new ImageData(new Uint8ClampedArray(width * height * 4), width, height);
     }
 
     public async create(canvas: HTMLCanvasElement, width: number, height: number): Promise<number[]>
     {
-        this.storageBufferSize = width * height * 16;
+        const size = Uint32Array.BYTES_PER_ELEMENT * 4;
+        this.storageBufferSize = width * height * size;
         await this.checkRequiredLimits(canvas);
 
         this.Renderer = new (await Device.Renderer(canvas));
@@ -105,7 +128,13 @@ export default class Scene
             ComputePipeline.CreateUniformBuffer("seed") as UniformBuffer<"seed", Uint32Array>;
 
         this.color3f = ComputePipeline.CreateStorageBuffer("color3f", this.storageBufferSize * 0.75);
-        this.color4u = ComputePipeline.CreateStorageBuffer("color4u", this.storageBufferSize);
+
+        this.denoiserBuffer = ComputePipeline.CreateReadableBuffer(this.storageBufferSize);
+
+        this.color4u = ComputePipeline.CreateStorageBuffer("color4u", {
+            length: this.storageBufferSize,
+            usage: GPUBufferUsage.COPY_SRC
+        });
 
         const { spheres, buffer: spheresBuffer } =
             ComputePipeline.CreateStorageBuffer("spheres", sphereObjects.length);
@@ -165,6 +194,26 @@ export default class Scene
         RenderPipeline.SetDrawParams(6);
     }
 
+    private async render(): Promise<void>
+    {
+        this.updateSeedAndSampsBuffer();
+        this.Computation.Compute(false);
+
+        this.Computation.CopyBufferToBuffer(
+            this.color4u.buffer,
+            this.denoiserBuffer
+        );
+
+        this.Computation.Submit();
+        this.Renderer.Render();
+
+        if (!(++this.sampsCount % this.denoiserFreq))
+            await this.denoise();
+
+        if (this.sampsCount < this.quartSamps)
+            requestAnimationFrame(this.draw);
+    }
+
     private updateSeedAndSampsBuffer(): void
     {
         this.seed[0] = Math.random() * 0xffffffff;
@@ -174,26 +223,21 @@ export default class Scene
         this.Computation.WriteBuffer(this.seedBuffer, this.seed);
     }
 
-    private render(): void
+    private async denoise(): Promise<void>
     {
-        this.updateSeedAndSampsBuffer();
-        this.Computation.Compute();
-        this.Renderer.Render();
+        await this.denoiserBuffer.mapAsync(GPUMapMode.READ);
+        this.image.data.set(new Uint32Array(this.denoiserBuffer.getMappedRange()));
 
-        if (++this.sampsCount < this.quartSamps)
-            requestAnimationFrame(this.draw);
-    }
+        this.denoiserBuffer.unmap();
+        const context = this.context!;
 
-    public resize(width: number, height: number): void
-    {
-        clearTimeout(this.resizeTimeout);
-
-        this.resizeTimeout = setTimeout(() =>
+        this.unet.tileExecute(
         {
-            Device.Destroy([this.color3f.buffer, this.color4u.buffer]);
-            this.create(this.Renderer.Canvas, width, height);
-            this.setOutputCanvas(this.canvas, width, height);
-        }, 500);
+            done() {},
+            color: this.image,
+            progress: (_, tileData, tile) =>
+                tileData && context.putImageData(tileData, tile.x, tile.y)
+        });
     }
 
     private createSpheres(): Sphere[]
