@@ -6,8 +6,9 @@ const DIFF: Refl_t = 0;
 const SPEC: Refl_t = 1;
 const REFR: Refl_t = 2;
 
-const PI = radians(180);
 var<private> rnd: vec3u;
+const M_PI = radians(180);
+const M_1_PI = 1.0 / M_PI;
 
 override SAMPLES: f32 = 1.0;
 const GAMMA = vec3f(1 / 2.2);
@@ -84,19 +85,20 @@ fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool
 
 fn radiance(ray: Ray, depth: u32) -> vec3f
 {
+    var E = 1;
     var t: f32;
     var id = 0;
 
     var r = ray;
     var d = depth;
 
+    var e = vec3f(0);
     var cl = vec3f(0);
     var cf = vec3f(1);
 
     loop
     {
-        if (!intersect(r, &t, &id))
-        { return cl; }
+        if (!intersect(r, &t, &id)) { return cl; }
 
         let obj = spheres[id];
 
@@ -106,10 +108,10 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
         var f = obj.c;
 
         let p = max(max(f.x, f.y), f.z);
-        cl += cf * obj.e;
-        d++;
+        cl += cf * (obj.e * f32(E) + e);
 
-        if (d > 5)
+        d++;
+        if (d > 5 || p == 0)
         {
             if (rand() < p) { f *= (1 / p); }
             else { return cl; }
@@ -119,17 +121,48 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 
         if (obj.refl == DIFF)
         {
-            let r1 = 2 * PI * rand();
+            let r1 = 2 * M_PI * rand();
             let r2 = rand();
             let r2s = sqrt(r2);
 
             let w = nl;
             let u = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(w.x) > 0.1), w));
-
             let v = cross(w, u);
+
             let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));
 
+            e = vec3f(0);
+            for (var i = 0; i < i32(SPHERES); i++)
+            {
+                let s = spheres[i];
+
+                if (s.e.x <= 0 && s.e.y <= 0 && s.e.z <= 0) { continue; }
+
+                let sw = s.p - x;
+                // `abs(w.x) > 0.1` was replaced by `abs(w.x) > EPS` to fix the vertical line artifact:
+                let su = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(sw.x) > EPS), sw));
+                let sv = cross(sw, su);
+
+                let cos_a_max = sqrt(1 - s.rad * s.rad / dot(x - s.p, x - s.p));
+
+                let eps1 = rand();
+                let eps2 = rand();
+
+                let cos_a = 1 - eps1 + eps1 * cos_a_max;
+                let sin_a = sqrt(1 - cos_a * cos_a);
+                let phi = 2 * M_PI * eps2;
+
+                let l = normalize(su * cos(phi) * sin_a + sv * sin(phi) * sin_a + sw * cos_a);
+
+                if (intersect(Ray(x, l), &t, &id) && id == i)
+                {
+                    let omega = 2 * M_PI * (1 - cos_a_max);
+                    e += f * (s.e * dot(l, nl) * omega) * M_1_PI;
+                }
+            }
+
             r = Ray(x, d);
+            E = 0;
             continue;
         }
         else if (obj.refl == SPEC)

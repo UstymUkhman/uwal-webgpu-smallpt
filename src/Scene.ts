@@ -233,7 +233,7 @@ export default class Scene
             rad: [1e3],
             e: [0, 0, 0],
             refl: [Material.DIFF],
-            c: [0.5, 0.5, 0.5]
+            c: [0.8, 0.8, 0.8]
         }, {
             p: [27, 16.5, 47],
             rad: [16.5],
