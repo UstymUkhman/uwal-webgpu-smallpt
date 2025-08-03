@@ -1,6 +1,7 @@
 import { type UNet, initUNetFromURL } from "oidn-web";
 import Compute from "./Compute.wgsl?raw";
 import Render from "./Render.wgsl?raw";
+import Weights from "/rt_ldr.tza?url";
 enum Material { DIFF, SPEC, REFR };
 
 import {
@@ -40,7 +41,7 @@ export default class Scene
     public constructor()
     {
         Device.OnLost = () => void 0;
-        initUNetFromURL("/rt_ldr.tza").then(unet => this.unet = unet);
+        initUNetFromURL(Weights).then(unet => this.unet = unet);
     }
 
     public resize(width: number, height: number): void
