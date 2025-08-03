@@ -20,7 +20,7 @@ export default class Scene
     private seedBuffer!: GPUBuffer;
     private color3f!: StorageBuffer;
     private color4u!: StorageBuffer;
-    private readonly totSamps = 5e3;
+    private readonly totSamps = 500;
 
     private Computation!: Computation;
     private canvas!: HTMLCanvasElement;
@@ -33,9 +33,9 @@ export default class Scene
     private resizeTimeout?: NodeJS.Timeout;
     private seed!: Uint32Array<ArrayBuffer>;
 
-    private context!: CanvasRenderingContext2D;
     private readonly draw = this.render.bind(this);
     private readonly quartSamps = this.totSamps / 4;
+    private context!: CanvasRenderingContext2D | null;
 
     public constructor()
     {
@@ -52,13 +52,14 @@ export default class Scene
             Device.Destroy([this.color3f.buffer, this.color4u.buffer]);
             this.create(this.Renderer.Canvas, width, height);
             this.setOutputCanvas(this.canvas, width, height);
+            this.sampsCount = 0;
         }, 500);
     }
 
     public setOutputCanvas(canvas: HTMLCanvasElement, width: number, height: number)
     {
         this.canvas = canvas;
-        this.context = canvas.getContext("2d")!;
+        this.context = canvas.getContext("2d");
         this.canvas.width = width; this.canvas.height = height;
         this.image = new ImageData(new Uint8ClampedArray(width * height * 4), width, height);
     }
@@ -231,12 +232,9 @@ export default class Scene
         this.denoiserBuffer.unmap();
         const context = this.context!;
 
-        this.unet.tileExecute(
-        {
-            done() {},
-            color: this.image,
-            progress: (_, tileData, tile) =>
-                tileData && context.putImageData(tileData, tile.x, tile.y)
+        this.unet.tileExecute({
+            done: data => context.putImageData(data, 0, 0),
+            color: this.image
         });
     }
 

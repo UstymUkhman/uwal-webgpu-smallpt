@@ -3,7 +3,7 @@
 	"editor.codeActionsOnSave": { "source.fixAll.eslint": "never" },
 	"editor.bracketPairColorization.enabled": false,
     "typescript.format.semicolons": "insert",
-	"eslint.validate": ["typescript"],
+	  "eslint.validate": ["typescript"],
   },
 
   "folders": [{

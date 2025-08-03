@@ -2,6 +2,8 @@
 
 _WebGPU port of **smallpt**: Global Illumination in 99 lines of C++ by [Kevin Beason](https://kevinbeason.com/)._
 
+[![](./public/preview.jpg)](https://ustymukhman.github.io/smallpt-webgpu/dist/)
+
 # Introduction
 
 Original source code was found [here](https://www.kevinbeason.com/smallpt/) and ported to the web using TypeScript and WebGPU. Actually, this version is loosely based on two modifications of the original algorithm. The first one is called "explicit.cpp" which can be found [here](https://www.kevinbeason.com/smallpt/explicit.cpp) and, as its description specifies, is a

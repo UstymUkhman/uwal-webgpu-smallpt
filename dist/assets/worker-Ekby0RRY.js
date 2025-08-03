@@ -5912,303 +5912,303 @@ else {
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * =============================================================================
- */function cA(s){const{inputs:e,backend:t,attrs:n}=s,{axis:r}=n,i=Co(r,e[0].shape)[0],o=e.map(u=>u.shape);tv(o,i);const a=xo(e.map(u=>u.shape),i);if(me(a)===0)return t.makeTensorInfo(a,e[0].dtype,[]);const l=e.filter(u=>me(u.shape)>0);return l.length===1?Ls({inputs:{x:l[0]},backend:t}):Gi(l,i,t)}const hA={kernelName:tp,backendName:"webgpu",kernelFunc:cA},fA=[Mk,Uk,eE,WT,tA,rA,hA,Pk];for(const s of fA)Zb({...s,backendName:"webgpu-oidn"});async function dA(){try{const s={powerPreference:"high-performance"},e=await navigator.gpu.requestAdapter(s),t={},n=[];e.features.has("timestamp-query")&&n.push("timestamp-query"),e.features.has("bgra8unorm-storage")&&n.push(["bgra8unorm-storage"]),t.requiredFeatures=n;const r=e.limits;t.requiredLimits={maxComputeWorkgroupStorageSize:r.maxComputeWorkgroupStorageSize,maxComputeWorkgroupsPerDimension:r.maxComputeWorkgroupsPerDimension,maxStorageBufferBindingSize:r.maxStorageBufferBindingSize,maxBufferSize:r.maxBufferSize,maxComputeWorkgroupSizeX:r.maxComputeWorkgroupSizeX,maxComputeInvocationsPerWorkgroup:r.maxComputeInvocationsPerWorkgroup};const i=await e.requestDevice(t),o=e.info??await e.requestAdapterInfo?.();return pA(i,o)}catch{}}async function pA(s,e){let t=K.findBackend("webgpu-oidn");return t!=null||(t=new zo(s,e),K.registerBackend("webgpu-oidn",()=>t),await K.setBackend("webgpu-oidn")),t}async function mA(s,e,t){const n=await dA(),r=l0(s);return new ck(r,n,t)}async function gA(s,e,t){return fetch(s).then(n=>n.arrayBuffer()).then(n=>mA(n,e,t))}var yA=`const EPS = 1e-4;
-const INF = 1e20f;
-alias Refl_t = u32;
-
-const DIFF: Refl_t = 0;
-const SPEC: Refl_t = 1;
-const REFR: Refl_t = 2;
-
-var<private> rnd: vec3u;
-const M_PI = radians(180);
-const M_1_PI = 1.0 / M_PI;
-
-override SAMPLES: f32 = 1.0;
-const GAMMA = vec3f(1 / 2.2);
-override DIMENSION_SIZE = 16u;
-
-struct Sphere
-{
-    p: vec3f, rad: f32,
-    e: vec3f, refl: Refl_t, c: vec3f
-};
-
-struct Ray { o: vec3f, d: vec3f };
-
-fn init_rnd(id: vec3u, seed: vec3u)
-{
-    const A = vec3(
-        1741651 * 1009,
-        140893 * 1609 * 13,
-        6521 * 983 * 7 * 2
-    );
-
-    rnd = (id * A) ^ seed;
-}
-
-fn rand() -> f32
-{
-    const C = vec3(
-        60493 * 9377,
-        11279 * 2539 * 23,
-        7919 * 631 * 5 * 3
-    );
-
-    rnd = (rnd * C) ^ (rnd.yzx >> vec3(4u));
-    return f32(rnd.x ^ rnd.y) / f32(0xffffffff);
-}
-
-fn intersect_sphere(s: Sphere, r: Ray) -> f32
-{
-    let op = s.p - r.o;
-    let b = dot(op, r.d);
-
-    var det = b * b - dot(op, op) + s.rad * s.rad;
-
-    if (det < 0) { return 0; }
-    else { det = sqrt(det); }
-
-    var t = b - det;
-
-    if (t > EPS) { return t; }
-    else
-    {
-        t = b + det;
-        return select(0, t, t > EPS);
-    }
-}
-
-fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool
-{
-    *t = INF;
-
-    for (var s = i32(SPHERES - 1); s > -1; s--)
-    {
-        let d = intersect_sphere(spheres[s], r);
-
-        if (d != 0f && d < *t)
-        {
-            *t = d;
-            *id = s;
-        }
-    }
-
-    return *t < INF;
-}
-
-fn radiance(ray: Ray, depth: u32) -> vec3f
-{
-    var E = 1;
-    var t: f32;
-    var id = 0;
-
-    var r = ray;
-    var d = depth;
-
-    var e = vec3f(0);
-    var cl = vec3f(0);
-    var cf = vec3f(1);
-
-    loop
-    {
-        if (!intersect(r, &t, &id)) { return cl; }
-
-        let obj = spheres[id];
-
-        let x = r.o + r.d * t;
-        let n = normalize(x - obj.p);
-        let nl = select(-n, n, dot(n, r.d) < 0);
-        var f = obj.c;
-
-        let p = max(max(f.x, f.y), f.z);
-        cl += cf * (obj.e * f32(E) + e);
-
-        d++;
-        if (d > 5 || p == 0)
-        {
-            if (rand() < p) { f *= (1 / p); }
-            else { return cl; }
-        }
-
-        cf *= f;
-
-        if (obj.refl == DIFF)
-        {
-            let r1 = 2 * M_PI * rand();
-            let r2 = rand();
-            let r2s = sqrt(r2);
-
-            let w = nl;
-            let u = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(w.x) > 0.1), w));
-            let v = cross(w, u);
-
-            let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));
-
-            e = vec3f(0);
-            for (var i = 0; i < i32(SPHERES); i++)
-            {
-                let s = spheres[i];
-
-                if (s.e.x <= 0 && s.e.y <= 0 && s.e.z <= 0) { continue; }
-
-                let sw = s.p - x;
-                // \`abs(w.x) > 0.1\` was replaced by \`abs(w.x) > EPS\` to fix the vertical line artifact:
-                let su = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(sw.x) > EPS), sw));
-                let sv = cross(sw, su);
-
-                let cos_a_max = sqrt(1 - s.rad * s.rad / dot(x - s.p, x - s.p));
-
-                let eps1 = rand();
-                let eps2 = rand();
-
-                let cos_a = 1 - eps1 + eps1 * cos_a_max;
-                let sin_a = sqrt(1 - cos_a * cos_a);
-                let phi = 2 * M_PI * eps2;
-
-                let l = normalize(su * cos(phi) * sin_a + sv * sin(phi) * sin_a + sw * cos_a);
-
-                if (intersect(Ray(x, l), &t, &id) && id == i)
-                {
-                    let omega = 2 * M_PI * (1 - cos_a_max);
-                    e += f * (s.e * dot(l, nl) * omega) * M_1_PI;
-                }
-            }
-
-            r = Ray(x, d);
-            E = 0;
-            continue;
-        }
-        else if (obj.refl == SPEC)
-        {
-            r = Ray(x, r.d - n * 2 * dot(n, r.d));
-            continue;
-        }
-
-        let reflRay = Ray(x, r.d - n * 2 * dot(n, r.d));
-        let into = dot(n, nl) > 0;
-
-        let nc = 1f;
-        let nt = 1.5;
-        let nnt = select(nt / nc, nc / nt, into);
-        let ddn = dot(r.d, nl);
-
-        let cos2t = 1 - nnt * nnt * (1 - ddn * ddn);
-
-        if (cos2t < 0)
-        {
-            r = reflRay;
-            continue;
-        }
-
-        let tdir = normalize(r.d * nnt - n * select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t)));
-
-        let a = nt - nc;
-        let b = nt + nc;
-        let R0 = a * a / (b * b);
-        let c = 1 - select(dot(tdir, n), -ddn, into);
-
-        let Re = R0 + (1 - R0) * c * c * c * c * c;
-        let Tr = 1 - Re;
-        let P = 0.25 + 0.5 * Re;
-        let RP = Re / P;
-        let TP = Tr / (1 - P);
-
-        if (rand() < P)
-        {
-            cf *= RP;
-            r = reflRay;
-        }
-        else
-        {
-            cf *= TP;
-            r = Ray(x, tdir);
-        }
-
-        continue;
-    }
-}
-
-@group(0) @binding(0) var<uniform> res: vec3f;
-@group(0) @binding(1) var<uniform> seed: vec3u;
-@group(0) @binding(2) var<storage, read_write> color3f: array<vec3f>;
-@group(0) @binding(3) var<storage, read_write> color4u: array<vec4u>;
-@group(0) @binding(4) var<storage, read> spheres: array<Sphere, SPHERES>;
-
-@compute @workgroup_size(DIMENSION_SIZE, DIMENSION_SIZE)
-fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
-{
-    let coord = vec2f(globalInvocation.xy);
-    init_rnd(globalInvocation, seed);
-
-    if (all(coord < res.xy))
-    {
-        let cam = Ray(
-            vec3f(50, 52, 295.6),
-            normalize(vec3f(0, -0.042612, -1))
-        );
-
-        let iy = res.y - coord.y - 1;
-        let i = u32(coord.x + iy * res.x);
-
-        let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);
-        let cy = normalize(cross(cx, cam.d)) * 0.5135;
-
-        for (var sy = 0u; sy < 2; sy++)
-        {
-            for (var sx = 0u; sx < 2; sx++)
-            {
-                let r1 = rand() * 2;
-                let r2 = rand() * 2;
-
-                let dx = select(1 - sqrt(2 - r1), sqrt(r1) - 1, r1 < 1);
-                let dy = select(1 - sqrt(2 - r2), sqrt(r2) - 1, r2 < 1);
-
-                var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +
-                        cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;
-
-                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * SAMPLES;
-                color3f[i] = color3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;
-            }
-        }
-
-        color4u[i] = vec4u(vec3u(
-            pow(clamp(color3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5
-        ), 255);
-    }
-}
-`,bA=`struct VertexOutput
-{
-    @builtin(position) position: vec4f,
-    @location(1) @interpolate(flat) res: vec2u
-};
-
-@group(0) @binding(1) var<storage, read_write> color4u: array<vec4u>;
-
-@vertex fn vertex(@builtin(vertex_index) index: u32) -> VertexOutput
-{
-    var output: VertexOutput;
-    let position = GetQuadCoord(index);
-
-    output.position = vec4f(position, 0, 1);
-    output.res = vec2u(resolution.xy);
-
-    return output;
-}
-
-@fragment fn fragment(
-    @builtin(position) position: vec4f,
-    @location(1) @interpolate(flat) res: vec2u
-) -> @location(0) vec4f
-{
-    let pos = vec2u(position.xy);
-
-    let x = pos.x % res.x;
-    let y = pos.y % res.y;
-    let i = x + y * res.x;
-
-    return vec4f(color4u[i]) / 255;
-}
+ */function cA(s){const{inputs:e,backend:t,attrs:n}=s,{axis:r}=n,i=Co(r,e[0].shape)[0],o=e.map(u=>u.shape);tv(o,i);const a=xo(e.map(u=>u.shape),i);if(me(a)===0)return t.makeTensorInfo(a,e[0].dtype,[]);const l=e.filter(u=>me(u.shape)>0);return l.length===1?Ls({inputs:{x:l[0]},backend:t}):Gi(l,i,t)}const hA={kernelName:tp,backendName:"webgpu",kernelFunc:cA},fA=[Mk,Uk,eE,WT,tA,rA,hA,Pk];for(const s of fA)Zb({...s,backendName:"webgpu-oidn"});async function dA(){try{const s={powerPreference:"high-performance"},e=await navigator.gpu.requestAdapter(s),t={},n=[];e.features.has("timestamp-query")&&n.push("timestamp-query"),e.features.has("bgra8unorm-storage")&&n.push(["bgra8unorm-storage"]),t.requiredFeatures=n;const r=e.limits;t.requiredLimits={maxComputeWorkgroupStorageSize:r.maxComputeWorkgroupStorageSize,maxComputeWorkgroupsPerDimension:r.maxComputeWorkgroupsPerDimension,maxStorageBufferBindingSize:r.maxStorageBufferBindingSize,maxBufferSize:r.maxBufferSize,maxComputeWorkgroupSizeX:r.maxComputeWorkgroupSizeX,maxComputeInvocationsPerWorkgroup:r.maxComputeInvocationsPerWorkgroup};const i=await e.requestDevice(t),o=e.info??await e.requestAdapterInfo?.();return pA(i,o)}catch{}}async function pA(s,e){let t=K.findBackend("webgpu-oidn");return t!=null||(t=new zo(s,e),K.registerBackend("webgpu-oidn",()=>t),await K.setBackend("webgpu-oidn")),t}async function mA(s,e,t){const n=await dA(),r=l0(s);return new ck(r,n,t)}async function gA(s,e,t){return fetch(s).then(n=>n.arrayBuffer()).then(n=>mA(n,e,t))}var yA=`const EPS = 1e-4;\r
+const INF = 1e20f;\r
+alias Refl_t = u32;\r
+\r
+const DIFF: Refl_t = 0;\r
+const SPEC: Refl_t = 1;\r
+const REFR: Refl_t = 2;\r
+\r
+var<private> rnd: vec3u;\r
+const M_PI = radians(180);\r
+const M_1_PI = 1.0 / M_PI;\r
+\r
+override SAMPLES: f32 = 1.0;\r
+const GAMMA = vec3f(1 / 2.2);\r
+override DIMENSION_SIZE = 16u;\r
+\r
+struct Sphere\r
+{\r
+    p: vec3f, rad: f32,\r
+    e: vec3f, refl: Refl_t, c: vec3f\r
+};\r
+\r
+struct Ray { o: vec3f, d: vec3f };\r
+\r
+fn init_rnd(id: vec3u, seed: vec3u)\r
+{\r
+    const A = vec3(\r
+        1741651 * 1009,\r
+        140893 * 1609 * 13,\r
+        6521 * 983 * 7 * 2\r
+    );\r
+\r
+    rnd = (id * A) ^ seed;\r
+}\r
+\r
+fn rand() -> f32\r
+{\r
+    const C = vec3(\r
+        60493 * 9377,\r
+        11279 * 2539 * 23,\r
+        7919 * 631 * 5 * 3\r
+    );\r
+\r
+    rnd = (rnd * C) ^ (rnd.yzx >> vec3(4u));\r
+    return f32(rnd.x ^ rnd.y) / f32(0xffffffff);\r
+}\r
+\r
+fn intersect_sphere(s: Sphere, r: Ray) -> f32\r
+{\r
+    let op = s.p - r.o;\r
+    let b = dot(op, r.d);\r
+\r
+    var det = b * b - dot(op, op) + s.rad * s.rad;\r
+\r
+    if (det < 0) { return 0; }\r
+    else { det = sqrt(det); }\r
+\r
+    var t = b - det;\r
+\r
+    if (t > EPS) { return t; }\r
+    else\r
+    {\r
+        t = b + det;\r
+        return select(0, t, t > EPS);\r
+    }\r
+}\r
+\r
+fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool\r
+{\r
+    *t = INF;\r
+\r
+    for (var s = i32(SPHERES - 1); s > -1; s--)\r
+    {\r
+        let d = intersect_sphere(spheres[s], r);\r
+\r
+        if (d != 0f && d < *t)\r
+        {\r
+            *t = d;\r
+            *id = s;\r
+        }\r
+    }\r
+\r
+    return *t < INF;\r
+}\r
+\r
+fn radiance(ray: Ray, depth: u32) -> vec3f\r
+{\r
+    var E = 1;\r
+    var t: f32;\r
+    var id = 0;\r
+\r
+    var r = ray;\r
+    var d = depth;\r
+\r
+    var e = vec3f(0);\r
+    var cl = vec3f(0);\r
+    var cf = vec3f(1);\r
+\r
+    loop\r
+    {\r
+        if (!intersect(r, &t, &id)) { return cl; }\r
+\r
+        let obj = spheres[id];\r
+\r
+        let x = r.o + r.d * t;\r
+        let n = normalize(x - obj.p);\r
+        let nl = select(-n, n, dot(n, r.d) < 0);\r
+        var f = obj.c;\r
+\r
+        let p = max(max(f.x, f.y), f.z);\r
+        cl += cf * (obj.e * f32(E) + e);\r
+\r
+        d++;\r
+        if (d > 5 || p == 0)\r
+        {\r
+            if (rand() < p) { f *= (1 / p); }\r
+            else { return cl; }\r
+        }\r
+\r
+        cf *= f;\r
+\r
+        if (obj.refl == DIFF)\r
+        {\r
+            let r1 = 2 * M_PI * rand();\r
+            let r2 = rand();\r
+            let r2s = sqrt(r2);\r
+\r
+            let w = nl;\r
+            let u = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(w.x) > 0.1), w));\r
+            let v = cross(w, u);\r
+\r
+            let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));\r
+\r
+            e = vec3f(0);\r
+            for (var i = 0; i < i32(SPHERES); i++)\r
+            {\r
+                let s = spheres[i];\r
+\r
+                if (s.e.x <= 0 && s.e.y <= 0 && s.e.z <= 0) { continue; }\r
+\r
+                let sw = s.p - x;\r
+                // \`abs(w.x) > 0.1\` was replaced by \`abs(w.x) > EPS\` to fix the vertical line artifact:\r
+                let su = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(sw.x) > EPS), sw));\r
+                let sv = cross(sw, su);\r
+\r
+                let cos_a_max = sqrt(1 - s.rad * s.rad / dot(x - s.p, x - s.p));\r
+\r
+                let eps1 = rand();\r
+                let eps2 = rand();\r
+\r
+                let cos_a = 1 - eps1 + eps1 * cos_a_max;\r
+                let sin_a = sqrt(1 - cos_a * cos_a);\r
+                let phi = 2 * M_PI * eps2;\r
+\r
+                let l = normalize(su * cos(phi) * sin_a + sv * sin(phi) * sin_a + sw * cos_a);\r
+\r
+                if (intersect(Ray(x, l), &t, &id) && id == i)\r
+                {\r
+                    let omega = 2 * M_PI * (1 - cos_a_max);\r
+                    e += f * (s.e * dot(l, nl) * omega) * M_1_PI;\r
+                }\r
+            }\r
+\r
+            r = Ray(x, d);\r
+            E = 0;\r
+            continue;\r
+        }\r
+        else if (obj.refl == SPEC)\r
+        {\r
+            r = Ray(x, r.d - n * 2 * dot(n, r.d));\r
+            continue;\r
+        }\r
+\r
+        let reflRay = Ray(x, r.d - n * 2 * dot(n, r.d));\r
+        let into = dot(n, nl) > 0;\r
+\r
+        let nc = 1f;\r
+        let nt = 1.5;\r
+        let nnt = select(nt / nc, nc / nt, into);\r
+        let ddn = dot(r.d, nl);\r
+\r
+        let cos2t = 1 - nnt * nnt * (1 - ddn * ddn);\r
+\r
+        if (cos2t < 0)\r
+        {\r
+            r = reflRay;\r
+            continue;\r
+        }\r
+\r
+        let tdir = normalize(r.d * nnt - n * select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t)));\r
+\r
+        let a = nt - nc;\r
+        let b = nt + nc;\r
+        let R0 = a * a / (b * b);\r
+        let c = 1 - select(dot(tdir, n), -ddn, into);\r
+\r
+        let Re = R0 + (1 - R0) * c * c * c * c * c;\r
+        let Tr = 1 - Re;\r
+        let P = 0.25 + 0.5 * Re;\r
+        let RP = Re / P;\r
+        let TP = Tr / (1 - P);\r
+\r
+        if (rand() < P)\r
+        {\r
+            cf *= RP;\r
+            r = reflRay;\r
+        }\r
+        else\r
+        {\r
+            cf *= TP;\r
+            r = Ray(x, tdir);\r
+        }\r
+\r
+        continue;\r
+    }\r
+}\r
+\r
+@group(0) @binding(0) var<uniform> res: vec3f;\r
+@group(0) @binding(1) var<uniform> seed: vec3u;\r
+@group(0) @binding(2) var<storage, read_write> color3f: array<vec3f>;\r
+@group(0) @binding(3) var<storage, read_write> color4u: array<vec4u>;\r
+@group(0) @binding(4) var<storage, read> spheres: array<Sphere, SPHERES>;\r
+\r
+@compute @workgroup_size(DIMENSION_SIZE, DIMENSION_SIZE)\r
+fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)\r
+{\r
+    let coord = vec2f(globalInvocation.xy);\r
+    init_rnd(globalInvocation, seed);\r
+\r
+    if (all(coord < res.xy))\r
+    {\r
+        let cam = Ray(\r
+            vec3f(50, 52, 295.6),\r
+            normalize(vec3f(0, -0.042612, -1))\r
+        );\r
+\r
+        let iy = res.y - coord.y - 1;\r
+        let i = u32(coord.x + iy * res.x);\r
+\r
+        let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);\r
+        let cy = normalize(cross(cx, cam.d)) * 0.5135;\r
+\r
+        for (var sy = 0u; sy < 2; sy++)\r
+        {\r
+            for (var sx = 0u; sx < 2; sx++)\r
+            {\r
+                let r1 = rand() * 2;\r
+                let r2 = rand() * 2;\r
+\r
+                let dx = select(1 - sqrt(2 - r1), sqrt(r1) - 1, r1 < 1);\r
+                let dy = select(1 - sqrt(2 - r2), sqrt(r2) - 1, r2 < 1);\r
+\r
+                var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +\r
+                        cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;\r
+\r
+                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * SAMPLES;\r
+                color3f[i] = color3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;\r
+            }\r
+        }\r
+\r
+        color4u[i] = vec4u(vec3u(\r
+            pow(clamp(color3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5\r
+        ), 255);\r
+    }\r
+}\r
+`,bA=`struct VertexOutput\r
+{\r
+    @builtin(position) position: vec4f,\r
+    @location(1) @interpolate(flat) res: vec2u\r
+};\r
+\r
+@group(0) @binding(1) var<storage, read_write> color4u: array<vec4u>;\r
+\r
+@vertex fn vertex(@builtin(vertex_index) index: u32) -> VertexOutput\r
+{\r
+    var output: VertexOutput;\r
+    let position = GetQuadCoord(index);\r
+\r
+    output.position = vec4f(position, 0, 1);\r
+    output.res = vec2u(resolution.xy);\r
+\r
+    return output;\r
+}\r
+\r
+@fragment fn fragment(\r
+    @builtin(position) position: vec4f,\r
+    @location(1) @interpolate(flat) res: vec2u\r
+) -> @location(0) vec4f\r
+{\r
+    let pos = vec2u(position.xy);\r
+\r
+    let x = pos.x % res.x;\r
+    let y = pos.y % res.y;\r
+    let i = x + y * res.x;\r
+\r
+    return vec4f(color4u[i]) / 255;\r
+}\r
 `,wA=Object.defineProperty,py=s=>{throw TypeError(s)},xA=(s,e,t)=>e in s?wA(s,e,{enumerable:!0,configurable:!0,writable:!0,value:t}):s[e]=t,Lt=(s,e,t)=>xA(s,typeof e!="symbol"?e+"":e,t),yh=(s,e,t)=>e.has(s)||py("Cannot "+t),T=(s,e,t)=>(yh(s,e,"read from private field"),t?t.call(s):e.get(s)),ee=(s,e,t)=>e.has(s)?py("Cannot add the same private member more than once"):e instanceof WeakSet?e.add(s):e.set(s,t),j=(s,e,t,n)=>(yh(s,e,"write to private field"),e.set(s,t),t),se=(s,e,t)=>(yh(s,e,"access private method"),t),rs,is,os,nn;const _A=class my{constructor(e=0,t,n,r=255){ee(this,rs,0),ee(this,is,0),ee(this,os,0),ee(this,nn,1),typeof t=="number"&&typeof n=="number"?this.RGBA=[e,t,n,r]:(j(this,rs,(e>>16&255)/255),j(this,is,(e>>8&255)/255),j(this,os,(255&e)/255),j(this,nn,r/255))}Set(e,t=255){return j(this,rs,(e>>16&255)/255),j(this,is,(e>>8&255)/255),j(this,os,(255&e)/255),j(this,nn,t/255),this}Premultiply(e,t){t??(t=new my),e??(e=T(this,nn));const n=T(this,rs)*e,r=T(this,is)*e,i=T(this,os)*e;return t.rgba=[n,r,i,e],t}set rgb(e){j(this,rs,e[0]),j(this,is,e[1]),j(this,os,e[2]),j(this,nn,e[3]??1)}get rgb(){return[T(this,rs),T(this,is),T(this,os)]}set a(e){j(this,nn,e)}get a(){return T(this,nn)}set rgba(e){this.rgb=e}get rgba(){return this.rgb.concat(T(this,nn))}set RGB(e){j(this,rs,e[0]/255),j(this,is,e[1]/255),j(this,os,e[2]/255),j(this,nn,(e[3]??255)/255)}get RGB(){return[255*T(this,rs),255*T(this,is),255*T(this,os)]}set A(e){j(this,nn,e/255)}get A(){return 255*T(this,nn)}set RGBA(e){this.RGB=e}get RGBA(){return this.RGB.concat(this.A)}};rs=new WeakMap,is=new WeakMap,os=new WeakMap,nn=new WeakMap;let gl=_A;Ue({RAD:Math.PI/180,DEG:180/Math.PI,HPI:Math.PI/2,TAU:2*Math.PI});Ue({DEVICE_LOST:"Device::Lost"});const ie=Ue({FORMAT_NOT_SUPPORTED:"FORMAT_NOT_SUPPORTED",WEBGPU_NOT_SUPPORTED:"WEBGPU_NOT_SUPPORTED",ADAPTER_NOT_FOUND:"ADAPTER_NOT_FOUND",FEATURE_NOT_FOUND:"FEATURE_NOT_FOUND",DEVICE_NOT_FOUND:"DEVICE_NOT_FOUND",DEVICE_NOT_REQUESTED:"DEVICE_NOT_REQUESTED",DEVICE_LOST:"DEVICE_LOST",SHADER_CODE_NOT_FOUND:"SHADER_CODE_NOT_FOUND",SHADER_MODULE_NOT_FOUND:"SHADER_MODULE_NOT_FOUND",VERTEX_ENTRY_NOT_FOUND:"VERTEX_ENTRY_NOT_FOUND",VERTEX_ATTRIBUTE_NOT_FOUND:"VERTEX_ATTRIBUTE_NOT_FOUND",UNIFORM_NOT_FOUND:"UNIFORM_NOT_FOUND",STORAGE_NOT_FOUND:"STORAGE_NOT_FOUND",INVALID_UNIFORM_NAME:"INVALID_UNIFORM_NAME",BINDING_NOT_FOUND:"BINDING_NOT_FOUND",PIPELINE_NOT_FOUND:"PIPELINE_NOT_FOUND",LEGACY_RENDER_PIPELINE_NOT_FOUND:"LEGACY_RENDER_PIPELINE_NOT_FOUND",RENDERER_NOT_FOUND:"RENDERER_NOT_FOUND",TEXTURE_SIZE_NOT_FOUND:"TEXTURE_SIZE_NOT_FOUND",TEXTURE_NOT_FOUND:"TEXTURE_NOT_FOUND",INVALID_BYTES_PER_ROW:"INVALID_BYTES_PER_ROW",CANVAS_NOT_FOUND:"CANVAS_NOT_FOUND",CONTEXT_NOT_FOUND:"CONTEXT_NOT_FOUND",RENDER_PASS_NOT_FOUND:"RENDER_PASS_NOT_FOUND",COMMAND_ENCODER_NOT_FOUND:"COMMAND_ENCODER_NOT_FOUND",FONT_TEXTURE_NOT_FOUND:"FONT_TEXTURE_NOT_FOUND",TIMESTAMP_QUERY_NOT_FOUND:"TIMESTAMP_QUERY_NOT_FOUND",RENDER_PASS_ENDED:"RENDER_PASS_ENDED"}),gy=Ue({FORMAT_NOT_SUPPORTED:"Format is not yet supported: ",WEBGPU_NOT_SUPPORTED:"WebGPU is not supported in this browser.",ADAPTER_NOT_FOUND:"Failed to get a GPUAdapter.",DEVICE_NOT_FOUND:"Failed to get a GPUDevice.",FEATURE_NOT_FOUND:"Failed to get a GPUFeature ",DEVICE_NOT_REQUESTED:"GPUDevice was not requested.",DEVICE_LOST:"WebGPU device was lost. ",SHADER_CODE_NOT_FOUND:`Failed to get a WGSL shader when creating shader module.
         An empty shader will be used instead.`,SHADER_MODULE_NOT_FOUND:"Failed to get shader module in ",VERTEX_ENTRY_NOT_FOUND:"Failed to find function ",VERTEX_ATTRIBUTE_NOT_FOUND:"Failed to find vertex attribute ",UNIFORM_NOT_FOUND:"Failed to find uniform ",STORAGE_NOT_FOUND:"Failed to find storage ",INVALID_UNIFORM_NAME:"Requested uniform is already in use and managed internally: ",BINDING_NOT_FOUND:"Failed to find binding ",PIPELINE_NOT_FOUND:"Failed to get GPU",LEGACY_RENDER_PIPELINE_NOT_FOUND:'"Device.RenderPipeline" instance is required in `LegacyTexture` for this operation.\n        Pass it to the `LegacyTexture` constructor or use `Texture.LegacyRenderer` setter before ',RENDERER_NOT_FOUND:'"Device.Renderer" instance is required in `Texture` for this operation.\n        Pass it to the `Texture` constructor or use `Texture.Renderer` setter before ',TEXTURE_SIZE_NOT_FOUND:"`size` array or a `width` value is required in `options` parameter of ",TEXTURE_NOT_FOUND:"`options` is required to have a `texture` value or its `create` entry\n        to be either `true` or a `TextureDescriptor` object when calling ",INVALID_BYTES_PER_ROW:"`bytesPerRow` parameter is not a multiple of 256 in ",CANVAS_NOT_FOUND:"Failed to get a WebGPU canvas.",CONTEXT_NOT_FOUND:"Failed to get a WebGPU context.",RENDER_PASS_NOT_FOUND:"Failed to use pipeline in render pass because it has not started.",COMMAND_ENCODER_NOT_FOUND:"Failed to get a GPUCommandEncoder.",FONT_TEXTURE_NOT_FOUND:"Failed to find font texture in ",TIMESTAMP_QUERY_NOT_FOUND:'"timestamp-query" feature is required to be set with\n        `Device.SetRequiredFeatures` when creating a new `GPUTiming` instance.',RENDER_PASS_ENDED:"Failed get a render pass because it has ended.\n        `Render` method has to be called with `submit` flag set to `false`."}),vA=Ue({WEBGPU_NOT_SUPPORTED:0,ADAPTER_NOT_FOUND:1,DEVICE_NOT_FOUND:2,DEVICE_NOT_REQUESTED:3,DEVICE_LOST:4,CANVAS_NOT_FOUND:5,CONTEXT_NOT_FOUND:6,COMMAND_ENCODER_NOT_FOUND:7,PIPELINE_NOT_FOUND:8});function Bt(s,e){console.warn(`${gy[s]}${e??""}`.replace(/\s\s+/g," "))}function ue(s,e){throw Error(`${gy[s]}${e??""}`.replace(/\s\s+/g," "),{cause:vA[s]})}const Ct=Ue({INDEX:GPUBufferUsage.INDEX|GPUBufferUsage.COPY_DST,VERTEX:GPUBufferUsage.VERTEX|GPUBufferUsage.COPY_DST,STORAGE:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST,UNIFORM:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST,READABLE:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST,WRITABLE:GPUBufferUsage.MAP_WRITE|GPUBufferUsage.COPY_SRC,QUERY:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),cd={operation:"add",srcFactor:"one",dstFactor:"zero"},hd={operation:"add",srcFactor:"one",dstFactor:"one"},fd={operation:"add",srcFactor:"one",dstFactor:"one-minus-src-alpha"},dd={operation:"add",srcFactor:"one-minus-dst-alpha",dstFactor:"one"},pd={operation:"add",srcFactor:"dst-alpha",dstFactor:"zero"},md={operation:"add",srcFactor:"zero",dstFactor:"src-alpha"},gd={operation:"add",srcFactor:"one-minus-dst-alpha",dstFactor:"zero"},yd={operation:"add",srcFactor:"zero",dstFactor:"one-minus-src-alpha"},bd={operation:"add",srcFactor:"dst-alpha",dstFactor:"one-minus-src-alpha"},wd={operation:"add",srcFactor:"one-minus-dst-alpha",dstFactor:"src-alpha"};Ue({COPY:Ue({color:cd,alpha:cd}),ADDITIVE:Ue({color:hd,alpha:hd}),SOURCE_OVER:Ue({color:fd,alpha:fd}),DESTINATION_OVER:Ue({color:dd,alpha:dd}),SOURCE_IN:Ue({color:pd,alpha:pd}),DESTINATION_IN:Ue({color:md,alpha:md}),SOURCE_OUT:Ue({color:gd,alpha:gd}),DESTINATION_OUT:Ue({color:yd,alpha:yd}),SOURCE_ATOP:Ue({color:bd,alpha:bd}),DESTINATION_ATOP:Ue({color:wd,alpha:wd})});class an{constructor(e,t){this.name=e,this.attributes=t,this.size=0}get isArray(){return!1}get isStruct(){return!1}get isTemplate(){return!1}get isPointer(){return!1}getTypeName(){return this.name}}class xd{constructor(e,t,n){this.name=e,this.type=t,this.attributes=n,this.offset=0,this.size=0}get isArray(){return this.type.isArray}get isStruct(){return this.type.isStruct}get isTemplate(){return this.type.isTemplate}get align(){return this.type.isStruct?this.type.align:0}get members(){return this.type.isStruct?this.type.members:null}get format(){return this.type.isArray||this.type.isTemplate?this.type.format:null}get count(){return this.type.isArray?this.type.count:0}get stride(){return this.type.isArray?this.type.stride:this.size}}class Ns extends an{constructor(e,t){super(e,t),this.members=[],this.align=0,this.startLine=-1,this.endLine=-1,this.inUse=!1}get isStruct(){return!0}}class Ps extends an{constructor(e,t){super(e,t),this.count=0,this.stride=0}get isArray(){return!0}getTypeName(){return`array<${this.format.getTypeName()}, ${this.count}>`}}class tc extends an{constructor(e,t,n){super(e,n),this.format=t}get isPointer(){return!0}getTypeName(){return"&"+this.format.getTypeName()}}class Ar extends an{constructor(e,t,n,r){super(e,n),this.format=t,this.access=r}get isTemplate(){return!0}getTypeName(){let e=this.name;if(this.format!==null){if(e==="vec2"||e==="vec3"||e==="vec4"||e==="mat2x2"||e==="mat2x3"||e==="mat2x4"||e==="mat3x2"||e==="mat3x3"||e==="mat3x4"||e==="mat4x2"||e==="mat4x3"||e==="mat4x4"){if(this.format.name==="f32")return e+="f",e;if(this.format.name==="i32")return e+="i",e;if(this.format.name==="u32")return e+="u",e;if(this.format.name==="bool")return e+="b",e;if(this.format.name==="f16")return e+="h",e}e+=`<${this.format.name}>`}else if(e==="vec2"||e==="vec3"||e==="vec4")return e;return e}}var Is;(s=>{s[s.Uniform=0]="Uniform",s[s.Storage=1]="Storage",s[s.Texture=2]="Texture",s[s.Sampler=3]="Sampler",s[s.StorageTexture=4]="StorageTexture"})(Is||(Is={}));class ua{constructor(e,t,n,r,i,o,a){this.name=e,this.type=t,this.group=n,this.binding=r,this.attributes=i,this.resourceType=o,this.access=a}get isArray(){return this.type.isArray}get isStruct(){return this.type.isStruct}get isTemplate(){return this.type.isTemplate}get size(){return this.type.size}get align(){return this.type.isStruct?this.type.align:0}get members(){return this.type.isStruct?this.type.members:null}get format(){return this.type.isArray||this.type.isTemplate?this.type.format:null}get count(){return this.type.isArray?this.type.count:0}get stride(){return this.type.isArray?this.type.stride:this.size}}class SA{constructor(e,t){this.name=e,this.type=t}}class kA{constructor(e,t,n,r){this.name=e,this.type=t,this.locationType=n,this.location=r,this.interpolation=null}}class _d{constructor(e,t,n,r){this.name=e,this.type=t,this.locationType=n,this.location=r}}class IA{constructor(e,t,n,r){this.name=e,this.type=t,this.attributes=n,this.id=r}}class EA{constructor(e,t,n){this.name=e,this.type=t,this.attributes=n}}class TA{constructor(e,t=null,n){this.stage=null,this.inputs=[],this.outputs=[],this.arguments=[],this.returnType=null,this.resources=[],this.overrides=[],this.startLine=-1,this.endLine=-1,this.inUse=!1,this.calls=new Set,this.name=e,this.stage=t,this.attributes=n}}class AA{constructor(){this.vertex=[],this.fragment=[],this.compute=[]}}const yy=new Float32Array(1),CA=new Int32Array(yy.buffer),xt=new Uint16Array(1);function NA(s){yy[0]=s;const e=CA[0],t=e>>31&1;let n=e>>23&255,r=8388607&e;if(n===255)return xt[0]=t<<15|31744|(r!==0?512:0),xt[0];if(n===0){if(r===0)return xt[0]=t<<15,xt[0];r|=8388608;let i=113;for(;!(8388608&r);)r<<=1,i--;return n=127-i,r&=8388607,n>0?(r=(r>>126-n)+(r>>127-n&1),xt[0]=t<<15|n<<10|r>>13,xt[0]):(xt[0]=t<<15,xt[0])}return n=n-127+15,n>=31?(xt[0]=t<<15|31744,xt[0]):n<=0?n<-10?(xt[0]=t<<15,xt[0]):(r=(8388608|r)>>1-n,xt[0]=t<<15|r>>13,xt[0]):(r>>=13,xt[0]=t<<15|n<<10|r,xt[0])}const bh=new Uint32Array(1),by=new Float32Array(bh.buffer,0,1);function vd(s){const e=112+(s>>6&31)<<23|(63&s)<<17;return bh[0]=e,by[0]}function ve(s,e,t,n){const r=[0,0,0,0];for(let u=0;u<n;++u)switch(t){case"8unorm":r[u]=s[e]/255,e++;break;case"8snorm":r[u]=s[e]/255*2-1,e++;break;case"8uint":r[u]=s[e],e++;break;case"8sint":r[u]=s[e]-127,e++;break;case"16uint":r[u]=s[e]|s[e+1]<<8,e+=2;break;case"16sint":r[u]=(s[e]|s[e+1]<<8)-32768,e+=2;break;case"16float":r[u]=(o=(32768&(i=s[e]|s[e+1]<<8))>>15,l=1023&i,(a=(31744&i)>>10)==0?(o?-1:1)*Math.pow(2,-14)*(l/1024):a==31?l?NaN:1/0*(o?-1:1):(o?-1:1)*Math.pow(2,a-15)*(1+l/1024)),e+=2;break;case"32uint":case"32sint":r[u]=s[e]|s[e+1]<<8|s[e+2]<<16|s[e+3]<<24,e+=4;break;case"32float":r[u]=new Float32Array(s.buffer,e,1)[0],e+=4}var i,o,a,l;return r}function Ee(s,e,t,n,r){for(let i=0;i<n;++i)switch(t){case"8unorm":s[e]=255*r[i],e++;break;case"8snorm":s[e]=127.5*(r[i]+1),e++;break;case"8uint":s[e]=r[i],e++;break;case"8sint":s[e]=r[i]+127,e++;break;case"16uint":new Uint16Array(s.buffer,e,1)[0]=r[i],e+=2;break;case"16sint":new Int16Array(s.buffer,e,1)[0]=r[i],e+=2;break;case"16float":{const o=NA(r[i]);new Uint16Array(s.buffer,e,1)[0]=o,e+=2;break}case"32uint":new Uint32Array(s.buffer,e,1)[0]=r[i],e+=4;break;case"32sint":new Int32Array(s.buffer,e,1)[0]=r[i],e+=4;break;case"32float":new Float32Array(s.buffer,e,1)[0]=r[i],e+=4}return r}const yu={r8unorm:{bytesPerBlock:1,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r8snorm:{bytesPerBlock:1,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r8uint:{bytesPerBlock:1,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r8sint:{bytesPerBlock:1,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},rg8unorm:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg8snorm:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg8uint:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg8sint:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rgba8unorm:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},"rgba8unorm-srgb":{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba8snorm:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba8uint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba8sint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},bgra8unorm:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},"bgra8unorm-srgb":{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},r16uint:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r16sint:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r16float:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},rg16uint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg16sint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg16float:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rgba16uint:{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba16sint:{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba16float:{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},r32uint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r32sint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},r32float:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:1},rg32uint:{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg32sint:{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rg32float:{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,channels:2},rgba32uint:{bytesPerBlock:16,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba32sint:{bytesPerBlock:16,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgba32float:{bytesPerBlock:16,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgb10a2uint:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rgb10a2unorm:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},rg11b10ufloat:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},stencil8:{bytesPerBlock:1,blockWidth:1,blockHeight:1,isCompressed:!1,isDepthStencil:!0,hasDepth:!1,hasStencil:!0,channels:1},depth16unorm:{bytesPerBlock:2,blockWidth:1,blockHeight:1,isCompressed:!1,isDepthStencil:!0,hasDepth:!0,hasStencil:!1,channels:1},depth24plus:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,isDepthStencil:!0,hasDepth:!0,hasStencil:!1,depthOnlyFormat:"depth32float",channels:1},"depth24plus-stencil8":{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,isDepthStencil:!0,hasDepth:!0,hasStencil:!0,depthOnlyFormat:"depth32float",channels:1},depth32float:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,isDepthStencil:!0,hasDepth:!0,hasStencil:!1,channels:1},"depth32float-stencil8":{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!1,isDepthStencil:!0,hasDepth:!0,hasStencil:!0,stencilOnlyFormat:"depth32float",channels:1},rgb9e5ufloat:{bytesPerBlock:4,blockWidth:1,blockHeight:1,isCompressed:!1,channels:4},"bc1-rgba-unorm":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc1-rgba-unorm-srgb":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc2-rgba-unorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc2-rgba-unorm-srgb":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc3-rgba-unorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc3-rgba-unorm-srgb":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc4-r-unorm":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:1},"bc4-r-snorm":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:1},"bc5-rg-unorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:2},"bc5-rg-snorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:2},"bc6h-rgb-ufloat":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc6h-rgb-float":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc7-rgba-unorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"bc7-rgba-unorm-srgb":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"etc2-rgb8unorm":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"etc2-rgb8unorm-srgb":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"etc2-rgb8a1unorm":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"etc2-rgb8a1unorm-srgb":{bytesPerBlock:8,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"etc2-rgba8unorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"etc2-rgba8unorm-srgb":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"eac-r11unorm":{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!0,channels:1},"eac-r11snorm":{bytesPerBlock:8,blockWidth:1,blockHeight:1,isCompressed:!0,channels:1},"eac-rg11unorm":{bytesPerBlock:16,blockWidth:1,blockHeight:1,isCompressed:!0,channels:2},"eac-rg11snorm":{bytesPerBlock:16,blockWidth:1,blockHeight:1,isCompressed:!0,channels:2},"astc-4x4-unorm":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"astc-4x4-unorm-srgb":{bytesPerBlock:16,blockWidth:4,blockHeight:4,isCompressed:!0,channels:4},"astc-5x4-unorm":{bytesPerBlock:16,blockWidth:5,blockHeight:4,isCompressed:!0,channels:4},"astc-5x4-unorm-srgb":{bytesPerBlock:16,blockWidth:5,blockHeight:4,isCompressed:!0,channels:4},"astc-5x5-unorm":{bytesPerBlock:16,blockWidth:5,blockHeight:5,isCompressed:!0,channels:4},"astc-5x5-unorm-srgb":{bytesPerBlock:16,blockWidth:5,blockHeight:5,isCompressed:!0,channels:4},"astc-6x5-unorm":{bytesPerBlock:16,blockWidth:6,blockHeight:5,isCompressed:!0,channels:4},"astc-6x5-unorm-srgb":{bytesPerBlock:16,blockWidth:6,blockHeight:5,isCompressed:!0,channels:4},"astc-6x6-unorm":{bytesPerBlock:16,blockWidth:6,blockHeight:6,isCompressed:!0,channels:4},"astc-6x6-unorm-srgb":{bytesPerBlock:16,blockWidth:6,blockHeight:6,isCompressed:!0,channels:4},"astc-8x5-unorm":{bytesPerBlock:16,blockWidth:8,blockHeight:5,isCompressed:!0,channels:4},"astc-8x5-unorm-srgb":{bytesPerBlock:16,blockWidth:8,blockHeight:5,isCompressed:!0,channels:4},"astc-8x6-unorm":{bytesPerBlock:16,blockWidth:8,blockHeight:6,isCompressed:!0,channels:4},"astc-8x6-unorm-srgb":{bytesPerBlock:16,blockWidth:8,blockHeight:6,isCompressed:!0,channels:4},"astc-8x8-unorm":{bytesPerBlock:16,blockWidth:8,blockHeight:8,isCompressed:!0,channels:4},"astc-8x8-unorm-srgb":{bytesPerBlock:16,blockWidth:8,blockHeight:8,isCompressed:!0,channels:4},"astc-10x5-unorm":{bytesPerBlock:16,blockWidth:10,blockHeight:5,isCompressed:!0,channels:4},"astc-10x5-unorm-srgb":{bytesPerBlock:16,blockWidth:10,blockHeight:5,isCompressed:!0,channels:4},"astc-10x6-unorm":{bytesPerBlock:16,blockWidth:10,blockHeight:6,isCompressed:!0,channels:4},"astc-10x6-unorm-srgb":{bytesPerBlock:16,blockWidth:10,blockHeight:6,isCompressed:!0,channels:4},"astc-10x8-unorm":{bytesPerBlock:16,blockWidth:10,blockHeight:8,isCompressed:!0,channels:4},"astc-10x8-unorm-srgb":{bytesPerBlock:16,blockWidth:10,blockHeight:8,isCompressed:!0,channels:4},"astc-10x10-unorm":{bytesPerBlock:16,blockWidth:10,blockHeight:10,isCompressed:!0,channels:4},"astc-10x10-unorm-srgb":{bytesPerBlock:16,blockWidth:10,blockHeight:10,isCompressed:!0,channels:4},"astc-12x10-unorm":{bytesPerBlock:16,blockWidth:12,blockHeight:10,isCompressed:!0,channels:4},"astc-12x10-unorm-srgb":{bytesPerBlock:16,blockWidth:12,blockHeight:10,isCompressed:!0,channels:4},"astc-12x12-unorm":{bytesPerBlock:16,blockWidth:12,blockHeight:12,isCompressed:!0,channels:4},"astc-12x12-unorm-srgb":{bytesPerBlock:16,blockWidth:12,blockHeight:12,isCompressed:!0,channels:4}};class dn{constructor(){this.id=dn._id++,this.line=0}get isAstNode(){return!0}get astNodeType(){return""}search(e){e(this)}searchBlock(e,t){if(e){t(yl.instance);for(const n of e)n instanceof Array?this.searchBlock(n,t):n.search(t);t(bl.instance)}}constEvaluate(e,t){throw Error("Cannot evaluate node")}constEvaluateString(e){return this.constEvaluate(e).toString()}}dn._id=0;class yl extends dn{}yl.instance=new yl;class bl extends dn{}bl.instance=new bl;const wy=new Set(["all","all","any","select","arrayLength","abs","acos","acosh","asin","asinh","atan","atanh","atan2","ceil","clamp","cos","cosh","countLeadingZeros","countOneBits","countTrailingZeros","cross","degrees","determinant","distance","dot","dot4U8Packed","dot4I8Packed","exp","exp2","extractBits","faceForward","firstLeadingBit","firstTrailingBit","floor","fma","fract","frexp","insertBits","inverseSqrt","ldexp","length","log","log2","max","min","mix","modf","normalize","pow","quantizeToF16","radians","reflect","refract","reverseBits","round","saturate","sign","sin","sinh","smoothStep","sqrt","step","tan","tanh","transpose","trunc","dpdx","dpdxCoarse","dpdxFine","dpdy","dpdyCoarse","dpdyFine","fwidth","fwidthCoarse","fwidthFine","textureDimensions","textureGather","textureGatherCompare","textureLoad","textureNumLayers","textureNumLevels","textureNumSamples","textureSample","textureSampleBias","textureSampleCompare","textureSampleCompareLevel","textureSampleGrad","textureSampleLevel","textureSampleBaseClampToEdge","textureStore","atomicLoad","atomicStore","atomicAdd","atomicSub","atomicMax","atomicMin","atomicAnd","atomicOr","atomicXor","atomicExchange","atomicCompareExchangeWeak","pack4x8snorm","pack4x8unorm","pack4xI8","pack4xU8","pack4x8Clamp","pack4xU8Clamp","pack2x16snorm","pack2x16unorm","pack2x16float","unpack4x8snorm","unpack4x8unorm","unpack4xI8","unpack4xU8","unpack2x16snorm","unpack2x16unorm","unpack2x16float","storageBarrier","textureBarrier","workgroupBarrier","workgroupUniformLoad","subgroupAdd","subgroupExclusiveAdd","subgroupInclusiveAdd","subgroupAll","subgroupAnd","subgroupAny","subgroupBallot","subgroupBroadcast","subgroupBroadcastFirst","subgroupElect","subgroupMax","subgroupMin","subgroupMul","subgroupExclusiveMul","subgroupInclusiveMul","subgroupOr","subgroupShuffle","subgroupShuffleDown","subgroupShuffleUp","subgroupShuffleXor","subgroupXor","quadBroadcast","quadSwapDiagonal","quadSwapX","quadSwapY"]);class ze extends dn{constructor(){super()}}class Eo extends ze{constructor(e,t,n,r,i,o){super(),this.calls=new Set,this.name=e,this.args=t,this.returnType=n,this.body=r,this.startLine=i,this.endLine=o}get astNodeType(){return"function"}search(e){if(this.attributes)for(const t of this.attributes)e(t);e(this);for(const t of this.args)e(t);this.searchBlock(this.body,e)}}class $A extends ze{constructor(e){super(),this.expression=e}get astNodeType(){return"staticAssert"}search(e){this.expression.search(e)}}class xy extends ze{constructor(e,t){super(),this.condition=e,this.body=t}get astNodeType(){return"while"}search(e){this.condition.search(e),this.searchBlock(this.body,e)}}class nc extends ze{constructor(e,t){super(),this.body=e,this.loopId=t}get astNodeType(){return"continuing"}search(e){this.searchBlock(this.body,e)}}class _y extends ze{constructor(e,t,n,r){super(),this.init=e,this.condition=t,this.increment=n,this.body=r}get astNodeType(){return"for"}search(e){var t,n,r;(t=this.init)===null||t===void 0||t.search(e),(n=this.condition)===null||n===void 0||n.search(e),(r=this.increment)===null||r===void 0||r.search(e),this.searchBlock(this.body,e)}}class ms extends ze{constructor(e,t,n,r,i){super(),this.attributes=null,this.name=e,this.type=t,this.storage=n,this.access=r,this.value=i}get astNodeType(){return"var"}search(e){var t;e(this),(t=this.value)===null||t===void 0||t.search(e)}}class wh extends ze{constructor(e,t,n){super(),this.attributes=null,this.name=e,this.type=t,this.value=n}get astNodeType(){return"override"}search(e){var t;(t=this.value)===null||t===void 0||t.search(e)}}class oo extends ze{constructor(e,t,n,r,i){super(),this.attributes=null,this.name=e,this.type=t,this.storage=n,this.access=r,this.value=i}get astNodeType(){return"let"}search(e){var t;e(this),(t=this.value)===null||t===void 0||t.search(e)}}class Ea extends ze{constructor(e,t,n,r,i){super(),this.attributes=null,this.name=e,this.type=t,this.storage=n,this.access=r,this.value=i}get astNodeType(){return"const"}constEvaluate(e,t){return this.value.constEvaluate(e,t)}search(e){var t;e(this),(t=this.value)===null||t===void 0||t.search(e)}}var Yr,Vi,G,F;(s=>{s.increment="++",s.decrement="--"})(Yr||(Yr={})),(s=>{s.parse=e=>{const t=e;if(t=="parse")throw Error("Invalid value for IncrementOperator");return s[t]}})(Yr||(Yr={}));class vy extends ze{constructor(e,t){super(),this.operator=e,this.variable=t}get astNodeType(){return"increment"}search(e){this.variable.search(e)}}(s=>{s.assign="=",s.addAssign="+=",s.subtractAssin="-=",s.multiplyAssign="*=",s.divideAssign="/=",s.moduloAssign="%=",s.andAssign="&=",s.orAssign="|=",s.xorAssign="^=",s.shiftLeftAssign="<<=",s.shiftRightAssign=">>="})(Vi||(Vi={})),(Vi||(Vi={})).parse=s=>{const e=s;if(e=="parse")throw Error("Invalid value for AssignOperator");return e};class Sy extends ze{constructor(e,t,n){super(),this.operator=e,this.variable=t,this.value=n}get astNodeType(){return"assign"}search(e){this.variable.search(e),this.value.search(e)}}class xh extends ze{constructor(e,t){super(),this.name=e,this.args=t}get astNodeType(){return"call"}isBuiltin(){return wy.has(this.name)}search(e){for(const t of this.args)t.search(e);e(this)}}class ky extends ze{constructor(e,t){super(),this.body=e,this.continuing=t}get astNodeType(){return"loop"}}class Iy extends ze{constructor(e,t){super(),this.condition=e,this.cases=t}get astNodeType(){return"switch"}search(e){e(this);for(const t of this.cases)t.search(e)}}class Ey extends ze{constructor(e,t,n,r){super(),this.condition=e,this.body=t,this.elseif=n,this.else=r}get astNodeType(){return"if"}search(e){this.condition.search(e),this.searchBlock(this.body,e),this.searchBlock(this.elseif,e),this.searchBlock(this.else,e)}}class Ty extends ze{constructor(e){super(),this.value=e}get astNodeType(){return"return"}search(e){var t;(t=this.value)===null||t===void 0||t.search(e)}}class DA extends ze{constructor(e){super(),this.name=e}get astNodeType(){return"enable"}}class OA extends ze{constructor(e){super(),this.extensions=e}get astNodeType(){return"requires"}}class Ay extends ze{constructor(e,t){super(),this.severity=e,this.rule=t}get astNodeType(){return"diagnostic"}}class _h extends ze{constructor(e,t){super(),this.name=e,this.type=t}get astNodeType(){return"alias"}}class MA extends ze{constructor(){super()}get astNodeType(){return"discard"}}class Cy extends ze{constructor(){super(),this.condition=null,this.loopId=-1}get astNodeType(){return"break"}}class Ny extends ze{constructor(){super(),this.loopId=-1}get astNodeType(){return"continue"}}class Y extends ze{constructor(e){super(),this.attributes=null,this.name=e}get astNodeType(){return"type"}get isStruct(){return!1}get isArray(){return!1}static maxFormatType(e){let t=e[0];if(t.name==="f32")return t;for(let n=1;n<e.length;++n){const r=Y._priority.get(t.name);Y._priority.get(e[n].name)<r&&(t=e[n])}return t.name==="x32"?Y.i32:t}getTypeName(){return this.name}}Y.x32=new Y("x32"),Y.f32=new Y("f32"),Y.i32=new Y("i32"),Y.u32=new Y("u32"),Y.f16=new Y("f16"),Y.bool=new Y("bool"),Y.void=new Y("void"),Y._priority=new Map([["f32",0],["f16",1],["u32",2],["i32",3],["x32",3]]);class Sd extends Y{constructor(e){super(e)}}class cs extends Y{constructor(e,t,n,r){super(e),this.members=t,this.startLine=n,this.endLine=r}get astNodeType(){return"struct"}get isStruct(){return!0}getMemberIndex(e){for(let t=0;t<this.members.length;t++)if(this.members[t].name==e)return t;return-1}search(e){for(const t of this.members)e(t)}}class z extends Y{constructor(e,t,n){super(e),this.format=t,this.access=n}get astNodeType(){return"template"}getTypeName(){let e=this.name;if(this.format!==null){if(e==="vec2"||e==="vec3"||e==="vec4"||e==="mat2x2"||e==="mat2x3"||e==="mat2x4"||e==="mat3x2"||e==="mat3x3"||e==="mat3x4"||e==="mat4x2"||e==="mat4x3"||e==="mat4x4"){if(this.format.name==="f32")return e+="f",e;if(this.format.name==="i32")return e+="i",e;if(this.format.name==="u32")return e+="u",e;if(this.format.name==="bool")return e+="b",e;if(this.format.name==="f16")return e+="h",e}e+=`<${this.format.name}>`}else if(e==="vec2"||e==="vec3"||e==="vec4")return e;return e}}z.vec2f=new z("vec2",Y.f32,null),z.vec3f=new z("vec3",Y.f32,null),z.vec4f=new z("vec4",Y.f32,null),z.vec2i=new z("vec2",Y.i32,null),z.vec3i=new z("vec3",Y.i32,null),z.vec4i=new z("vec4",Y.i32,null),z.vec2u=new z("vec2",Y.u32,null),z.vec3u=new z("vec3",Y.u32,null),z.vec4u=new z("vec4",Y.u32,null),z.vec2h=new z("vec2",Y.f16,null),z.vec3h=new z("vec3",Y.f16,null),z.vec4h=new z("vec4",Y.f16,null),z.vec2b=new z("vec2",Y.bool,null),z.vec3b=new z("vec3",Y.bool,null),z.vec4b=new z("vec4",Y.bool,null),z.mat2x2f=new z("mat2x2",Y.f32,null),z.mat2x3f=new z("mat2x3",Y.f32,null),z.mat2x4f=new z("mat2x4",Y.f32,null),z.mat3x2f=new z("mat3x2",Y.f32,null),z.mat3x3f=new z("mat3x3",Y.f32,null),z.mat3x4f=new z("mat3x4",Y.f32,null),z.mat4x2f=new z("mat4x2",Y.f32,null),z.mat4x3f=new z("mat4x3",Y.f32,null),z.mat4x4f=new z("mat4x4",Y.f32,null),z.mat2x2h=new z("mat2x2",Y.f16,null),z.mat2x3h=new z("mat2x3",Y.f16,null),z.mat2x4h=new z("mat2x4",Y.f16,null),z.mat3x2h=new z("mat3x2",Y.f16,null),z.mat3x3h=new z("mat3x3",Y.f16,null),z.mat3x4h=new z("mat3x4",Y.f16,null),z.mat4x2h=new z("mat4x2",Y.f16,null),z.mat4x3h=new z("mat4x3",Y.f16,null),z.mat4x4h=new z("mat4x4",Y.f16,null),z.mat2x2i=new z("mat2x2",Y.i32,null),z.mat2x3i=new z("mat2x3",Y.i32,null),z.mat2x4i=new z("mat2x4",Y.i32,null),z.mat3x2i=new z("mat3x2",Y.i32,null),z.mat3x3i=new z("mat3x3",Y.i32,null),z.mat3x4i=new z("mat3x4",Y.i32,null),z.mat4x2i=new z("mat4x2",Y.i32,null),z.mat4x3i=new z("mat4x3",Y.i32,null),z.mat4x4i=new z("mat4x4",Y.i32,null),z.mat2x2u=new z("mat2x2",Y.u32,null),z.mat2x3u=new z("mat2x3",Y.u32,null),z.mat2x4u=new z("mat2x4",Y.u32,null),z.mat3x2u=new z("mat3x2",Y.u32,null),z.mat3x3u=new z("mat3x3",Y.u32,null),z.mat3x4u=new z("mat3x4",Y.u32,null),z.mat4x2u=new z("mat4x2",Y.u32,null),z.mat4x3u=new z("mat4x3",Y.u32,null),z.mat4x4u=new z("mat4x4",Y.u32,null);class Ta extends Y{constructor(e,t,n,r){super(e),this.storage=t,this.type=n,this.access=r}get astNodeType(){return"pointer"}}class ao extends Y{constructor(e,t,n,r){super(e),this.attributes=t,this.format=n,this.count=r}get astNodeType(){return"array"}get isArray(){return!0}}class qi extends Y{constructor(e,t,n){super(e),this.format=t,this.access=n}get astNodeType(){return"sampler"}}class Dn extends dn{constructor(){super(),this.postfix=null}}class Cr extends Dn{constructor(e){super(),this.value=e}get astNodeType(){return"stringExpr"}toString(){return this.value}constEvaluateString(){return this.value}}class Hn extends Dn{constructor(e,t){super(),this.type=e,this.args=t}get astNodeType(){return"createExpr"}search(e){if(e(this),this.args)for(const t of this.args)t.search(e)}constEvaluate(e,t){return t&&(t[0]=this.type),e.evalExpression(this,e.context)}}class vh extends Dn{constructor(e,t){super(),this.cachedReturnValue=null,this.name=e,this.args=t}get astNodeType(){return"callExpr"}setCachedReturnValue(e){this.cachedReturnValue=e}get isBuiltin(){return wy.has(this.name)}constEvaluate(e,t){return e.evalExpression(this,e.context)}search(e){for(const t of this.args)t.search(e);e(this)}}class Yt extends Dn{constructor(e){super(),this.name=e}get astNodeType(){return"varExpr"}search(e){e(this),this.postfix&&this.postfix.search(e)}constEvaluate(e,t){return e.evalExpression(this,e.context)}}class $y extends Dn{constructor(e,t){super(),this.name=e,this.initializer=t}get astNodeType(){return"constExpr"}constEvaluate(e,t){if(this.initializer){const n=e.evalExpression(this.initializer,e.context);return n!==null&&this.postfix?n.getSubData(e,this.postfix,e.context):n}return null}search(e){this.initializer.search(e)}}class et extends Dn{constructor(e,t){super(),this.value=e,this.type=t}get astNodeType(){return"literalExpr"}constEvaluate(e,t){return t!==void 0&&(t[0]=this.type),this.value}get isScalar(){return this.value instanceof B}get isVector(){return this.value instanceof P||this.value instanceof de}get scalarValue(){return this.value instanceof B?this.value.value:(console.error("Value is not scalar."),0)}get vectorValue(){return this.value instanceof P||this.value instanceof de?this.value.data:(console.error("Value is not a vector or matrix."),new Float32Array(0))}}class Dy extends Dn{constructor(e,t){super(),this.type=e,this.value=t}get astNodeType(){return"bitcastExpr"}search(e){this.value.search(e)}}class gi extends Dn{constructor(e){super(),this.index=e}search(e){this.index.search(e)}}class Oy extends Dn{constructor(){super()}}class Xe extends Oy{constructor(e,t){super(),this.operator=e,this.right=t}get astNodeType(){return"unaryOp"}constEvaluate(e,t){return e.evalExpression(this,e.context)}search(e){this.right.search(e)}}class bn extends Oy{constructor(e,t,n){super(),this.operator=e,this.left=t,this.right=n}get astNodeType(){return"binaryOp"}_getPromotedType(e,t){return e.name===t.name?e:e.name==="f32"||t.name==="f32"?Y.f32:e.name==="u32"||t.name==="u32"?Y.u32:Y.i32}constEvaluate(e,t){return e.evalExpression(this,e.context)}search(e){this.left.search(e),this.right.search(e)}}class My extends dn{constructor(e){super(),this.body=e}search(e){e(this),this.searchBlock(this.body,e)}}class Aa extends Dn{constructor(){super()}get astNodeType(){return"default"}}class Py extends My{constructor(e,t){super(t),this.selectors=e}get astNodeType(){return"case"}search(e){this.searchBlock(this.body,e)}}class Ry extends My{constructor(e){super(e)}get astNodeType(){return"default"}search(e){this.searchBlock(this.body,e)}}class kd extends dn{constructor(e,t,n){super(),this.name=e,this.type=t,this.attributes=n}get astNodeType(){return"argument"}}class PA extends dn{constructor(e,t){super(),this.condition=e,this.body=t}get astNodeType(){return"elseif"}search(e){this.condition.search(e),this.searchBlock(this.body,e)}}class Id extends dn{constructor(e,t,n){super(),this.name=e,this.type=t,this.attributes=n}get astNodeType(){return"member"}}class Ly extends dn{constructor(e,t){super(),this.name=e,this.value=t}get astNodeType(){return"attribute"}}class un{constructor(e,t){this.parent=null,this.typeInfo=e,this.parent=t,this.id=un._id++}clone(){throw"Clone: Not implemented for "+this.constructor.name}setDataValue(e,t,n,r){console.error("SetDataValue: Not implemented for "+this.constructor.name)}getSubData(e,t,n){return console.error("GetDataValue: Not implemented for "+this.constructor.name),null}toString(){return`<${this.typeInfo.getTypeName()}>`}}un._id=0;class sc extends un{constructor(){super(new an("void",null),null)}toString(){return"void"}}sc.void=new sc;class Mr extends un{constructor(e){super(new tc("pointer",e.typeInfo,null),null),this.reference=e}clone(){return this}setDataValue(e,t,n,r){this.reference.setDataValue(e,t,n,r)}getSubData(e,t,n){return t?this.reference.getSubData(e,t,n):this}toString(){return"&"+this.reference.toString()}}class B extends un{constructor(e,t,n=null){super(t,n),e instanceof Int32Array||e instanceof Uint32Array||e instanceof Float32Array?this.data=e:this.typeInfo.name==="x32"?this.data=e-Math.floor(e)!=0?new Float32Array([e]):e>=0?new Uint32Array([e]):new Int32Array([e]):this.typeInfo.name==="i32"||this.typeInfo.name==="bool"?this.data=new Int32Array([e]):this.typeInfo.name==="u32"?this.data=new Uint32Array([e]):this.typeInfo.name==="f32"||this.typeInfo.name==="f16"?this.data=new Float32Array([e]):console.error("ScalarData2: Invalid type",t)}clone(){if(this.data instanceof Float32Array)return new B(new Float32Array(this.data),this.typeInfo,null);if(this.data instanceof Int32Array)return new B(new Int32Array(this.data),this.typeInfo,null);if(this.data instanceof Uint32Array)return new B(new Uint32Array(this.data),this.typeInfo,null);throw"ScalarData: Invalid data type"}get value(){return this.data[0]}set value(e){this.data[0]=e}setDataValue(e,t,n,r){if(n)return void console.error("SetDataValue: Scalar data does not support postfix",n);if(!(t instanceof B))return void console.error("SetDataValue: Invalid value",t);let i=t.data[0];this.typeInfo.name==="i32"||this.typeInfo.name==="u32"?i=Math.floor(i):this.typeInfo.name==="bool"&&(i=i?1:0),this.data[0]=i}getSubData(e,t,n){return t?(console.error("getSubData: Scalar data does not support postfix",t),null):this}toString(){return""+this.value}}function RA(s,e,t){const n=e.length;return n===2?t==="f32"?new P(new Float32Array(e),s.getTypeInfo("vec2f")):t==="i32"||t==="bool"?new P(new Int32Array(e),s.getTypeInfo("vec2i")):t==="u32"?new P(new Uint32Array(e),s.getTypeInfo("vec2u")):t==="f16"?new P(new Float32Array(e),s.getTypeInfo("vec2h")):(console.error("getSubData: Unknown format "+t),null):n===3?t==="f32"?new P(new Float32Array(e),s.getTypeInfo("vec3f")):t==="i32"||t==="bool"?new P(new Int32Array(e),s.getTypeInfo("vec3i")):t==="u32"?new P(new Uint32Array(e),s.getTypeInfo("vec3u")):t==="f16"?new P(new Float32Array(e),s.getTypeInfo("vec3h")):(console.error("getSubData: Unknown format "+t),null):n===4?t==="f32"?new P(new Float32Array(e),s.getTypeInfo("vec4f")):t==="i32"||t==="bool"?new P(new Int32Array(e),s.getTypeInfo("vec4i")):t==="u32"?new P(new Uint32Array(e),s.getTypeInfo("vec4u")):t==="f16"?new P(new Float32Array(e),s.getTypeInfo("vec4h")):(console.error("getSubData: Unknown format "+t),null):(console.error("getSubData: Invalid vector size "+e.length),null)}class P extends un{constructor(e,t,n=null){if(super(t,n),e instanceof Float32Array||e instanceof Uint32Array||e instanceof Int32Array)this.data=e;else{const r=this.typeInfo.name;r==="vec2f"||r==="vec3f"||r==="vec4f"?this.data=new Float32Array(e):r==="vec2i"||r==="vec3i"||r==="vec4i"?this.data=new Int32Array(e):r==="vec2u"||r==="vec3u"||r==="vec4u"?this.data=new Uint32Array(e):r==="vec2h"||r==="vec3h"||r==="vec4h"?this.data=new Float32Array(e):r==="vec2b"||r==="vec3b"||r==="vec4b"?this.data=new Int32Array(e):r==="vec2"||r==="vec3"||r==="vec4"?this.data=new Float32Array(e):console.error("VectorData: Invalid type "+r)}}clone(){if(this.data instanceof Float32Array)return new P(new Float32Array(this.data),this.typeInfo,null);if(this.data instanceof Int32Array)return new P(new Int32Array(this.data),this.typeInfo,null);if(this.data instanceof Uint32Array)return new P(new Uint32Array(this.data),this.typeInfo,null);throw"VectorData: Invalid data type"}setDataValue(e,t,n,r){n instanceof Cr?console.error("TODO: Set vector postfix"):t instanceof P?this.data=t.data:console.error("SetDataValue: Invalid value",t)}getSubData(e,t,n){if(t===null)return this;let r=e.getTypeInfo("f32");if(this.typeInfo instanceof Ar)r=this.typeInfo.format||r;else{const o=this.typeInfo.name;o==="vec2f"||o==="vec3f"||o==="vec4f"?r=e.getTypeInfo("f32"):o==="vec2i"||o==="vec3i"||o==="vec4i"?r=e.getTypeInfo("i32"):o==="vec2b"||o==="vec3b"||o==="vec4b"?r=e.getTypeInfo("bool"):o==="vec2u"||o==="vec3u"||o==="vec4u"?r=e.getTypeInfo("u32"):o==="vec2h"||o==="vec3h"||o==="vec4h"?r=e.getTypeInfo("f16"):console.error("GetSubData: Unknown type "+o)}let i=this;for(;t!==null&&i!==null;){if(t instanceof gi){const o=t.index;let a=-1;if(o instanceof et){if(!(o.value instanceof B))return console.error("GetSubData: Invalid array index "+o.value),null;a=o.value.value}else{const l=e.evalExpression(o,n);if(!(l instanceof B))return console.error("GetSubData: Unknown index type",o),null;a=l.value}if(a<0||a>=i.data.length)return console.error("GetSubData: Index out of range",a),null;if(i.data instanceof Float32Array){const l=new Float32Array(i.data.buffer,i.data.byteOffset+4*a,1);return new B(l,r)}if(i.data instanceof Int32Array){const l=new Int32Array(i.data.buffer,i.data.byteOffset+4*a,1);return new B(l,r)}if(i.data instanceof Uint32Array){const l=new Uint32Array(i.data.buffer,i.data.byteOffset+4*a,1);return new B(l,r)}throw"GetSubData: Invalid data type"}if(!(t instanceof Cr))return console.error("GetSubData: Unknown postfix",t),null;{const o=t.value.toLowerCase();if(o.length===1){let l=0;if(o==="x"||o==="r")l=0;else if(o==="y"||o==="g")l=1;else if(o==="z"||o==="b")l=2;else{if(o!=="w"&&o!=="a")return console.error("GetSubData: Unknown member "+o),null;l=3}if(this.data instanceof Float32Array){let u=new Float32Array(this.data.buffer,this.data.byteOffset+4*l,1);return new B(u,r,this)}if(this.data instanceof Int32Array){let u=new Int32Array(this.data.buffer,this.data.byteOffset+4*l,1);return new B(u,r,this)}if(this.data instanceof Uint32Array){let u=new Uint32Array(this.data.buffer,this.data.byteOffset+4*l,1);return new B(u,r,this)}}const a=[];for(const l of o)l==="x"||l==="r"?a.push(this.data[0]):l==="y"||l==="g"?a.push(this.data[1]):l==="z"||l==="b"?a.push(this.data[2]):l==="w"||l==="a"?a.push(this.data[3]):console.error("GetDataValue: Unknown member "+l);i=RA(e,a,r.name)}t=t.postfix}return i}toString(){let e=""+this.data[0];for(let t=1;t<this.data.length;++t)e+=", "+this.data[t];return e}}class de extends un{constructor(e,t,n=null){super(t,n),e instanceof Float32Array?this.data=e:this.data=new Float32Array(e)}clone(){return new de(new Float32Array(this.data),this.typeInfo,null)}setDataValue(e,t,n,r){n instanceof Cr?console.error("TODO: Set matrix postfix"):t instanceof de?this.data=t.data:console.error("SetDataValue: Invalid value",t)}getSubData(e,t,n){if(t===null)return this;const r=this.typeInfo.name;if(e.getTypeInfo("f32"),this.typeInfo instanceof Ar)this.typeInfo.format;else if(r.endsWith("f"))e.getTypeInfo("f32");else if(r.endsWith("i"))e.getTypeInfo("i32");else if(r.endsWith("u"))e.getTypeInfo("u32");else{if(!r.endsWith("h"))return console.error("GetDataValue: Unknown type "+r),null;e.getTypeInfo("f16")}if(t instanceof gi){const i=t.index;let o=-1;if(i instanceof et){if(!(i.value instanceof B))return console.error("GetDataValue: Invalid array index "+i.value),null;o=i.value.value}else{const u=e.evalExpression(i,n);if(!(u instanceof B))return console.error("GetDataValue: Unknown index type",i),null;o=u.value}if(o<0||o>=this.data.length)return console.error("GetDataValue: Index out of range",o),null;const a=r.endsWith("h")?"h":"f";let l;if(r==="mat2x2"||r==="mat2x2f"||r==="mat2x2h"||r==="mat3x2"||r==="mat3x2f"||r==="mat3x2h"||r==="mat4x2"||r==="mat4x2f"||r==="mat4x2h")l=new P(new Float32Array(this.data.buffer,this.data.byteOffset+8*o,2),e.getTypeInfo("vec2"+a));else if(r==="mat2x3"||r==="mat2x3f"||r==="mat2x3h"||r==="mat3x3"||r==="mat3x3f"||r==="mat3x3h"||r==="mat4x3"||r==="mat4x3f"||r==="mat4x3h")l=new P(new Float32Array(this.data.buffer,this.data.byteOffset+12*o,3),e.getTypeInfo("vec3"+a));else{if(r!=="mat2x4"&&r!=="mat2x4f"&&r!=="mat2x4h"&&r!=="mat3x4"&&r!=="mat3x4f"&&r!=="mat3x4h"&&r!=="mat4x4"&&r!=="mat4x4f"&&r!=="mat4x4h")return console.error("GetDataValue: Unknown type "+r),null;l=new P(new Float32Array(this.data.buffer,this.data.byteOffset+16*o,4),e.getTypeInfo("vec4"+a))}return t.postfix?l.getSubData(e,t.postfix,n):l}return console.error("GetDataValue: Invalid postfix",t),null}toString(){let e=""+this.data[0];for(let t=1;t<this.data.length;++t)e+=", "+this.data[t];return e}}class qe extends un{constructor(e,t,n=0,r=null){super(t,r),this.buffer=e instanceof ArrayBuffer?e:e.buffer,this.offset=n}clone(){const e=new Uint8Array(new Uint8Array(this.buffer,this.offset,this.typeInfo.size));return new qe(e.buffer,this.typeInfo,0,null)}setDataValue(e,t,n,r){if(t===null)return void console.log("setDataValue: NULL data.");let i=this.offset,o=this.typeInfo;for(;n;){if(n instanceof gi)if(o instanceof Ps){const a=n.index;if(a instanceof et){if(!(a.value instanceof B))return void console.error("SetDataValue: Invalid index type "+a.value);i+=a.value.value*o.stride}else{const l=e.evalExpression(a,r);if(!(l instanceof B))return void console.error("SetDataValue: Unknown index type",a);i+=l.value*o.stride}o=o.format}else console.error(`SetDataValue: Type ${o.getTypeName()} is not an array`);else{if(!(n instanceof Cr))return void console.error("SetDataValue: Unknown postfix type",n);{const a=n.value;if(o instanceof Ns){let l=!1;for(const u of o.members)if(u.name===a){i+=u.offset,o=u.type,l=!0;break}if(!l)return void console.error(`SetDataValue: Member ${a} not found`)}else if(o instanceof an){const l=o.getTypeName();let u=0;if(a==="x"||a==="r")u=0;else if(a==="y"||a==="g")u=1;else if(a==="z"||a==="b")u=2;else{if(a!=="w"&&a!=="a")return void console.error("SetDataValue: Unknown member "+a);u=3}if(!(t instanceof B))return void console.error("SetDataValue: Invalid value",t);const c=t.value;return l==="vec2f"?void(new Float32Array(this.buffer,i,2)[u]=c):l==="vec3f"?void(new Float32Array(this.buffer,i,3)[u]=c):l==="vec4f"?void(new Float32Array(this.buffer,i,4)[u]=c):l==="vec2i"?void(new Int32Array(this.buffer,i,2)[u]=c):l==="vec3i"?void(new Int32Array(this.buffer,i,3)[u]=c):l==="vec4i"?void(new Int32Array(this.buffer,i,4)[u]=c):l==="vec2u"?void(new Uint32Array(this.buffer,i,2)[u]=c):l==="vec3u"?void(new Uint32Array(this.buffer,i,3)[u]=c):l==="vec4u"?void(new Uint32Array(this.buffer,i,4)[u]=c):void console.error(`SetDataValue: Type ${l} is not a struct`)}}}n=n.postfix}this.setData(e,t,o,i,r)}setData(e,t,n,r,i){const o=n.getTypeName();if(o!=="f32"&&o!=="f16")if(o!=="i32"&&o!=="atomic<i32>"&&o!=="x32")if(o!=="u32"&&o!=="atomic<u32>")if(o!=="bool")if(o!=="vec2f"&&o!=="vec2h")if(o!=="vec3f"&&o!=="vec3h")if(o!=="vec4f"&&o!=="vec4h")if(o!=="vec2i")if(o!=="vec3i")if(o!=="vec4i")if(o!=="vec2u")if(o!=="vec3u")if(o!=="vec4u")if(o!=="vec2b")if(o!=="vec3b")if(o!=="vec4b")if(o!=="mat2x2f"&&o!=="mat2x2h")if(o!=="mat2x3f"&&o!=="mat2x3h")if(o!=="mat2x4f"&&o!=="mat2x4h")if(o!=="mat3x2f"&&o!=="mat3x2h")if(o!=="mat3x3f"&&o!=="mat3x3h")if(o!=="mat3x4f"&&o!=="mat3x4h")if(o!=="mat4x2f"&&o!=="mat4x2h")if(o!=="mat4x3f"&&o!=="mat4x3h")if(o!=="mat4x4f"&&o!=="mat4x4h")if(t instanceof qe){if(n===t.typeInfo)return void new Uint8Array(this.buffer,r,t.buffer.byteLength).set(new Uint8Array(t.buffer));console.error("SetDataValue: Type mismatch",o,t.typeInfo.getTypeName())}else console.error("SetData: Unknown type "+o);else{const a=new Float32Array(this.buffer,r,16);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5],a[6]=t.data[6],a[7]=t.data[7],a[8]=t.data[8],a[9]=t.data[9],a[10]=t.data[10],a[11]=t.data[11],a[12]=t.data[12],a[13]=t.data[13],a[14]=t.data[14],a[15]=t.data[15]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5],a[6]=t[6],a[7]=t[7],a[8]=t[8],a[9]=t[9],a[10]=t[10],a[11]=t[11],a[12]=t[12],a[13]=t[13],a[14]=t[14],a[15]=t[15])}else{const a=new Float32Array(this.buffer,r,12);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5],a[6]=t.data[6],a[7]=t.data[7],a[8]=t.data[8],a[9]=t.data[9],a[10]=t.data[10],a[11]=t.data[11]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5],a[6]=t[6],a[7]=t[7],a[8]=t[8],a[9]=t[9],a[10]=t[10],a[11]=t[11])}else{const a=new Float32Array(this.buffer,r,8);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5],a[6]=t.data[6],a[7]=t.data[7]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5],a[6]=t[6],a[7]=t[7])}else{const a=new Float32Array(this.buffer,r,12);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5],a[6]=t.data[6],a[7]=t.data[7],a[8]=t.data[8],a[9]=t.data[9],a[10]=t.data[10],a[11]=t.data[11]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5],a[6]=t[6],a[7]=t[7],a[8]=t[8],a[9]=t[9],a[10]=t[10],a[11]=t[11])}else{const a=new Float32Array(this.buffer,r,9);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5],a[6]=t.data[6],a[7]=t.data[7],a[8]=t.data[8]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5],a[6]=t[6],a[7]=t[7],a[8]=t[8])}else{const a=new Float32Array(this.buffer,r,6);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5])}else{const a=new Float32Array(this.buffer,r,8);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5],a[6]=t.data[6],a[7]=t.data[7]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5],a[6]=t[6],a[7]=t[7])}else{const a=new Float32Array(this.buffer,r,6);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3],a[4]=t.data[4],a[5]=t.data[5]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3],a[4]=t[4],a[5]=t[5])}else{const a=new Float32Array(this.buffer,r,4);t instanceof de?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3])}else{const a=new Uint32Array(this.buffer,r,4);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3])}else{const a=new Uint32Array(this.buffer,r,3);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2]):(a[0]=t[0],a[1]=t[1],a[2]=t[2])}else{const a=new Uint32Array(this.buffer,r,2);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1]):(a[0]=t[0],a[1]=t[1])}else{const a=new Uint32Array(this.buffer,r,4);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3])}else{const a=new Uint32Array(this.buffer,r,3);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2]):(a[0]=t[0],a[1]=t[1],a[2]=t[2])}else{const a=new Uint32Array(this.buffer,r,2);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1]):(a[0]=t[0],a[1]=t[1])}else{const a=new Int32Array(this.buffer,r,4);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3])}else{const a=new Int32Array(this.buffer,r,3);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2]):(a[0]=t[0],a[1]=t[1],a[2]=t[2])}else{const a=new Int32Array(this.buffer,r,2);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1]):(a[0]=t[0],a[1]=t[1])}else{const a=new Float32Array(this.buffer,r,4);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2],a[3]=t.data[3]):(a[0]=t[0],a[1]=t[1],a[2]=t[2],a[3]=t[3])}else{const a=new Float32Array(this.buffer,r,3);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1],a[2]=t.data[2]):(a[0]=t[0],a[1]=t[1],a[2]=t[2])}else{const a=new Float32Array(this.buffer,r,2);t instanceof P?(a[0]=t.data[0],a[1]=t.data[1]):(a[0]=t[0],a[1]=t[1])}else t instanceof B&&(new Int32Array(this.buffer,r,1)[0]=t.value);else t instanceof B&&(new Uint32Array(this.buffer,r,1)[0]=t.value);else t instanceof B&&(new Int32Array(this.buffer,r,1)[0]=t.value);else t instanceof B&&(new Float32Array(this.buffer,r,1)[0]=t.value)}getSubData(e,t,n){var r,i,o;if(t===null)return this;let a=this.offset,l=this.typeInfo;for(;t;){if(t instanceof gi){const c=t.index,h=c instanceof Dn?e.evalExpression(c,n):c;let d=0;if(h instanceof B?d=h.value:typeof h=="number"?d=h:console.error("GetDataValue: Invalid index type",c),l instanceof Ps)a+=d*l.stride,l=l.format;else{const w=l.getTypeName();w==="mat4x4"||w==="mat4x4f"||w==="mat4x4h"?(a+=16*d,l=e.getTypeInfo("vec4f")):console.error(`getDataValue: Type ${l.getTypeName()} is not an array`)}}else{if(!(t instanceof Cr))return console.error("GetDataValue: Unknown postfix type",t),null;{const c=t.value;if(l instanceof Ns){let h=!1;for(const d of l.members)if(d.name===c){a+=d.offset,l=d.type,h=!0;break}if(!h)return console.error(`GetDataValue: Member ${c} not found`),null}else if(l instanceof an){const h=l.getTypeName();if(h==="vec2f"||h==="vec3f"||h==="vec4f"||h==="vec2i"||h==="vec3i"||h==="vec4i"||h==="vec2u"||h==="vec3u"||h==="vec4u"||h==="vec2b"||h==="vec3b"||h==="vec4b"||h==="vec2h"||h==="vec3h"||h==="vec4h"||h==="vec2"||h==="vec3"||h==="vec4"){if(c.length>0&&c.length<5){let d="f";const w=[];for(let k=0;k<c.length;++k){const A=c[k].toLowerCase();let m=0;if(A==="x"||A==="r")m=0;else if(A==="y"||A==="g")m=1;else if(A==="z"||A==="b")m=2;else{if(A!=="w"&&A!=="a")return console.error("Unknown member "+c),null;m=3}if(c.length===1){if(h.endsWith("f"))return this.buffer.byteLength<a+4*m+4?(console.log("Insufficient buffer data"),null):new B(new Float32Array(this.buffer,a+4*m,1),e.getTypeInfo("f32"),this);if(h.endsWith("h"))return new B(new Float32Array(this.buffer,a+4*m,1),e.getTypeInfo("f16"),this);if(h.endsWith("i"))return new B(new Int32Array(this.buffer,a+4*m,1),e.getTypeInfo("i32"),this);if(h.endsWith("b"))return new B(new Int32Array(this.buffer,a+4*m,1),e.getTypeInfo("bool"),this);if(h.endsWith("u"))return new B(new Uint32Array(this.buffer,a+4*m,1),e.getTypeInfo("i32"),this)}if(h==="vec2f")w.push(new Float32Array(this.buffer,a,2)[m]);else if(h==="vec3f"){if(a+12>=this.buffer.byteLength)return console.log("Insufficient buffer data"),null;const S=new Float32Array(this.buffer,a,3);w.push(S[m])}else if(h==="vec4f")w.push(new Float32Array(this.buffer,a,4)[m]);else if(h==="vec2i")d="i",w.push(new Int32Array(this.buffer,a,2)[m]);else if(h==="vec3i")d="i",w.push(new Int32Array(this.buffer,a,3)[m]);else if(h==="vec4i")d="i",w.push(new Int32Array(this.buffer,a,4)[m]);else if(h==="vec2u"){d="u";const S=new Uint32Array(this.buffer,a,2);w.push(S[m])}else h==="vec3u"?(d="u",w.push(new Uint32Array(this.buffer,a,3)[m])):h==="vec4u"&&(d="u",w.push(new Uint32Array(this.buffer,a,4)[m]))}return w.length===2?l=e.getTypeInfo("vec2"+d):w.length===3?l=e.getTypeInfo("vec3"+d):w.length===4?l=e.getTypeInfo("vec4"+d):console.error("GetDataValue: Invalid vector length "+w.length),new P(w,l,null)}return console.error("GetDataValue: Unknown member "+c),null}return console.error(`GetDataValue: Type ${h} is not a struct`),null}}}t=t.postfix}const u=l.getTypeName();return u==="f32"?new B(new Float32Array(this.buffer,a,1),l,this):u==="i32"?new B(new Int32Array(this.buffer,a,1),l,this):u==="u32"?new B(new Uint32Array(this.buffer,a,1),l,this):u==="vec2f"?new P(new Float32Array(this.buffer,a,2),l,this):u==="vec3f"?new P(new Float32Array(this.buffer,a,3),l,this):u==="vec4f"?new P(new Float32Array(this.buffer,a,4),l,this):u==="vec2i"?new P(new Int32Array(this.buffer,a,2),l,this):u==="vec3i"?new P(new Int32Array(this.buffer,a,3),l,this):u==="vec4i"?new P(new Int32Array(this.buffer,a,4),l,this):u==="vec2u"?new P(new Uint32Array(this.buffer,a,2),l,this):u==="vec3u"?new P(new Uint32Array(this.buffer,a,3),l,this):u==="vec4u"?new P(new Uint32Array(this.buffer,a,4),l,this):l instanceof Ar&&l.name==="atomic"?((r=l.format)===null||r===void 0?void 0:r.name)==="u32"?new B(new Uint32Array(this.buffer,a,1)[0],l.format,this):((i=l.format)===null||i===void 0?void 0:i.name)==="i32"?new B(new Int32Array(this.buffer,a,1)[0],l.format,this):(console.error("GetDataValue: Invalid atomic format "+((o=l.format)===null||o===void 0?void 0:o.name)),null):new qe(this.buffer,l,a,this)}toString(){let e="";if(this.typeInfo instanceof Ps)if(this.typeInfo.format.name==="f32"){const t=new Float32Array(this.buffer,this.offset);e="["+t[0];for(let n=1;n<t.length;++n)e+=", "+t[n]}else if(this.typeInfo.format.name==="i32"){const t=new Int32Array(this.buffer,this.offset);e="["+t[0];for(let n=1;n<t.length;++n)e+=", "+t[n]}else if(this.typeInfo.format.name==="u32"){const t=new Uint32Array(this.buffer,this.offset);e="["+t[0];for(let n=1;n<t.length;++n)e+=", "+t[n]}else if(this.typeInfo.format.name==="vec2f"){const t=new Float32Array(this.buffer,this.offset);e=`[${t[0]}, ${t[1]}]`;for(let n=1;n<t.length/2;++n)e+=`, [${t[2*n]}, ${t[2*n+1]}]`}else if(this.typeInfo.format.name==="vec3f"){const t=new Float32Array(this.buffer,this.offset);e=`[${t[0]}, ${t[1]}, ${t[2]}]`;for(let n=4;n<t.length;n+=4)e+=`, [${t[n]}, ${t[n+1]}, ${t[n+2]}]`}else if(this.typeInfo.format.name==="vec4f"){const t=new Float32Array(this.buffer,this.offset);e=`[${t[0]}, ${t[1]}, ${t[2]}, ${t[3]}]`;for(let n=4;n<t.length;n+=4)e+=`, [${t[n]}, ${t[n+1]}, ${t[n+2]}, ${t[n+3]}]`}else e="[...]";else this.typeInfo instanceof Ns?e+="{...}":e="[...]";return e}}class hs extends un{constructor(e,t,n,r){super(t,null),this.data=e,this.descriptor=n,this.view=r}clone(){return new hs(this.data,this.typeInfo,this.descriptor,this.view)}get width(){var e,t;const n=this.descriptor.size;return n instanceof Array&&n.length>0?(e=n[0])!==null&&e!==void 0?e:0:n instanceof Object&&(t=n.width)!==null&&t!==void 0?t:0}get height(){var e,t;const n=this.descriptor.size;return n instanceof Array&&n.length>1?(e=n[1])!==null&&e!==void 0?e:0:n instanceof Object&&(t=n.height)!==null&&t!==void 0?t:0}get depthOrArrayLayers(){var e,t;const n=this.descriptor.size;return n instanceof Array&&n.length>2?(e=n[2])!==null&&e!==void 0?e:0:n instanceof Object&&(t=n.depthOrArrayLayers)!==null&&t!==void 0?t:0}get format(){var e;return this.descriptor&&(e=this.descriptor.format)!==null&&e!==void 0?e:"rgba8unorm"}get sampleCount(){var e;return this.descriptor&&(e=this.descriptor.sampleCount)!==null&&e!==void 0?e:1}get mipLevelCount(){var e;return this.descriptor&&(e=this.descriptor.mipLevelCount)!==null&&e!==void 0?e:1}get dimension(){var e;return this.descriptor&&(e=this.descriptor.dimension)!==null&&e!==void 0?e:"2d"}getMipLevelSize(e){if(e>=this.mipLevelCount)return[0,0,0];const t=[this.width,this.height,this.depthOrArrayLayers];for(let n=0;n<t.length;++n)t[n]=Math.max(1,t[n]>>e);return t}get texelByteSize(){const e=this.format,t=yu[e];return t?t.isDepthStencil?4:t.bytesPerBlock:0}get bytesPerRow(){return this.width*this.texelByteSize}get isDepthStencil(){const e=this.format,t=yu[e];return!!t&&t.isDepthStencil}getGpuSize(){const e=this.format,t=yu[e],n=this.width;if(!e||n<=0||!t)return-1;const r=this.height,i=this.depthOrArrayLayers,o=this.dimension;return n/t.blockWidth*(o==="1d"?1:r/t.blockHeight)*t.bytesPerBlock*i}getPixel(e,t,n=0,r=0){const i=this.texelByteSize,o=this.bytesPerRow,a=this.height,l=this.data[r];return((u,c,h,d,w,k,A,m)=>{const S=d*(A>>=w)*(k>>=w)+h*A+c*m;switch(this.format){case"r8unorm":return[ve(u,S,"8unorm",1)[0]];case"r8snorm":return[ve(u,S,"8snorm",1)[0]];case"r8uint":return[ve(u,S,"8uint",1)[0]];case"r8sint":return[ve(u,S,"8sint",1)[0]];case"rg8unorm":{const b=ve(u,S,"8unorm",2);return[b[0],b[1]]}case"rg8snorm":{const b=ve(u,S,"8snorm",2);return[b[0],b[1]]}case"rg8uint":{const b=ve(u,S,"8uint",2);return[b[0],b[1]]}case"rg8sint":{const b=ve(u,S,"8sint",2);return[b[0],b[1]]}case"rgba8unorm-srgb":case"rgba8unorm":{const b=ve(u,S,"8unorm",4);return[b[0],b[1],b[2],b[3]]}case"rgba8snorm":{const b=ve(u,S,"8snorm",4);return[b[0],b[1],b[2],b[3]]}case"rgba8uint":{const b=ve(u,S,"8uint",4);return[b[0],b[1],b[2],b[3]]}case"rgba8sint":{const b=ve(u,S,"8sint",4);return[b[0],b[1],b[2],b[3]]}case"bgra8unorm-srgb":case"bgra8unorm":{const b=ve(u,S,"8unorm",4);return[b[2],b[1],b[0],b[3]]}case"r16uint":return[ve(u,S,"16uint",1)[0]];case"r16sint":return[ve(u,S,"16sint",1)[0]];case"r16float":return[ve(u,S,"16float",1)[0]];case"rg16uint":{const b=ve(u,S,"16uint",2);return[b[0],b[1]]}case"rg16sint":{const b=ve(u,S,"16sint",2);return[b[0],b[1]]}case"rg16float":{const b=ve(u,S,"16float",2);return[b[0],b[1]]}case"rgba16uint":{const b=ve(u,S,"16uint",4);return[b[0],b[1],b[2],b[3]]}case"rgba16sint":{const b=ve(u,S,"16sint",4);return[b[0],b[1],b[2],b[3]]}case"rgba16float":{const b=ve(u,S,"16float",4);return[b[0],b[1],b[2],b[3]]}case"r32uint":return[ve(u,S,"32uint",1)[0]];case"r32sint":return[ve(u,S,"32sint",1)[0]];case"depth16unorm":case"depth24plus":case"depth24plus-stencil8":case"depth32float":case"depth32float-stencil8":case"r32float":return[ve(u,S,"32float",1)[0]];case"rg32uint":{const b=ve(u,S,"32uint",2);return[b[0],b[1]]}case"rg32sint":{const b=ve(u,S,"32sint",2);return[b[0],b[1]]}case"rg32float":{const b=ve(u,S,"32float",2);return[b[0],b[1]]}case"rgba32uint":{const b=ve(u,S,"32uint",4);return[b[0],b[1],b[2],b[3]]}case"rgba32sint":{const b=ve(u,S,"32sint",4);return[b[0],b[1],b[2],b[3]]}case"rgba32float":{const b=ve(u,S,"32float",4);return[b[0],b[1],b[2],b[3]]}case"rg11b10ufloat":{const b=new Uint32Array(u.buffer,S,1)[0],f=(4192256&b)>>11,v=(4290772992&b)>>22;return[vd(2047&b),vd(f),(_=>{const E=112+(_>>5&31)<<23|(31&_)<<18;return bh[0]=E,by[0]})(v),1]}}return null})(new Uint8Array(l),e,t,n,r,a,o,i)}setPixel(e,t,n,r,i){const o=this.texelByteSize,a=this.bytesPerRow,l=this.height,u=this.data[r];((c,h,d,w,k,A,m,S,b,f)=>{const v=w*(m>>=k)*(A>>=k)+d*m+h*S;switch(b){case"r8unorm":return void Ee(c,v,"8unorm",1,f);case"r8snorm":return void Ee(c,v,"8snorm",1,f);case"r8uint":return void Ee(c,v,"8uint",1,f);case"r8sint":return void Ee(c,v,"8sint",1,f);case"rg8unorm":return void Ee(c,v,"8unorm",2,f);case"rg8snorm":return void Ee(c,v,"8snorm",2,f);case"rg8uint":return void Ee(c,v,"8uint",2,f);case"rg8sint":return void Ee(c,v,"8sint",2,f);case"rgba8unorm-srgb":case"rgba8unorm":case"bgra8unorm-srgb":case"bgra8unorm":return void Ee(c,v,"8unorm",4,f);case"rgba8snorm":return void Ee(c,v,"8snorm",4,f);case"rgba8uint":return void Ee(c,v,"8uint",4,f);case"rgba8sint":return void Ee(c,v,"8sint",4,f);case"r16uint":return void Ee(c,v,"16uint",1,f);case"r16sint":return void Ee(c,v,"16sint",1,f);case"r16float":return void Ee(c,v,"16float",1,f);case"rg16uint":return void Ee(c,v,"16uint",2,f);case"rg16sint":return void Ee(c,v,"16sint",2,f);case"rg16float":return void Ee(c,v,"16float",2,f);case"rgba16uint":return void Ee(c,v,"16uint",4,f);case"rgba16sint":return void Ee(c,v,"16sint",4,f);case"rgba16float":return void Ee(c,v,"16float",4,f);case"r32uint":return void Ee(c,v,"32uint",1,f);case"r32sint":return void Ee(c,v,"32sint",1,f);case"depth16unorm":case"depth24plus":case"depth24plus-stencil8":case"depth32float":case"depth32float-stencil8":case"r32float":return void Ee(c,v,"32float",1,f);case"rg32uint":return void Ee(c,v,"32uint",2,f);case"rg32sint":return void Ee(c,v,"32sint",2,f);case"rg32float":return void Ee(c,v,"32float",2,f);case"rgba32uint":return void Ee(c,v,"32uint",4,f);case"rgba32sint":return void Ee(c,v,"32sint",4,f);case"rgba32float":return void Ee(c,v,"32float",4,f);case"rg11b10ufloat":console.error("TODO: rg11b10ufloat not supported for writing")}})(new Uint8Array(u),e,t,n,r,l,a,o,this.format,i)}}(s=>{s[s.token=0]="token",s[s.keyword=1]="keyword",s[s.reserved=2]="reserved"})(F||(F={}));class U{constructor(e,t,n){this.name=e,this.type=t,this.rule=n}toString(){return this.name}}class O{}G=O,O.none=new U("",F.reserved,""),O.eof=new U("EOF",F.token,""),O.reserved={asm:new U("asm",F.reserved,"asm"),bf16:new U("bf16",F.reserved,"bf16"),do:new U("do",F.reserved,"do"),enum:new U("enum",F.reserved,"enum"),f16:new U("f16",F.reserved,"f16"),f64:new U("f64",F.reserved,"f64"),handle:new U("handle",F.reserved,"handle"),i8:new U("i8",F.reserved,"i8"),i16:new U("i16",F.reserved,"i16"),i64:new U("i64",F.reserved,"i64"),mat:new U("mat",F.reserved,"mat"),premerge:new U("premerge",F.reserved,"premerge"),regardless:new U("regardless",F.reserved,"regardless"),typedef:new U("typedef",F.reserved,"typedef"),u8:new U("u8",F.reserved,"u8"),u16:new U("u16",F.reserved,"u16"),u64:new U("u64",F.reserved,"u64"),unless:new U("unless",F.reserved,"unless"),using:new U("using",F.reserved,"using"),vec:new U("vec",F.reserved,"vec"),void:new U("void",F.reserved,"void")},O.keywords={array:new U("array",F.keyword,"array"),atomic:new U("atomic",F.keyword,"atomic"),bool:new U("bool",F.keyword,"bool"),f32:new U("f32",F.keyword,"f32"),i32:new U("i32",F.keyword,"i32"),mat2x2:new U("mat2x2",F.keyword,"mat2x2"),mat2x3:new U("mat2x3",F.keyword,"mat2x3"),mat2x4:new U("mat2x4",F.keyword,"mat2x4"),mat3x2:new U("mat3x2",F.keyword,"mat3x2"),mat3x3:new U("mat3x3",F.keyword,"mat3x3"),mat3x4:new U("mat3x4",F.keyword,"mat3x4"),mat4x2:new U("mat4x2",F.keyword,"mat4x2"),mat4x3:new U("mat4x3",F.keyword,"mat4x3"),mat4x4:new U("mat4x4",F.keyword,"mat4x4"),ptr:new U("ptr",F.keyword,"ptr"),sampler:new U("sampler",F.keyword,"sampler"),sampler_comparison:new U("sampler_comparison",F.keyword,"sampler_comparison"),struct:new U("struct",F.keyword,"struct"),texture_1d:new U("texture_1d",F.keyword,"texture_1d"),texture_2d:new U("texture_2d",F.keyword,"texture_2d"),texture_2d_array:new U("texture_2d_array",F.keyword,"texture_2d_array"),texture_3d:new U("texture_3d",F.keyword,"texture_3d"),texture_cube:new U("texture_cube",F.keyword,"texture_cube"),texture_cube_array:new U("texture_cube_array",F.keyword,"texture_cube_array"),texture_multisampled_2d:new U("texture_multisampled_2d",F.keyword,"texture_multisampled_2d"),texture_storage_1d:new U("texture_storage_1d",F.keyword,"texture_storage_1d"),texture_storage_2d:new U("texture_storage_2d",F.keyword,"texture_storage_2d"),texture_storage_2d_array:new U("texture_storage_2d_array",F.keyword,"texture_storage_2d_array"),texture_storage_3d:new U("texture_storage_3d",F.keyword,"texture_storage_3d"),texture_depth_2d:new U("texture_depth_2d",F.keyword,"texture_depth_2d"),texture_depth_2d_array:new U("texture_depth_2d_array",F.keyword,"texture_depth_2d_array"),texture_depth_cube:new U("texture_depth_cube",F.keyword,"texture_depth_cube"),texture_depth_cube_array:new U("texture_depth_cube_array",F.keyword,"texture_depth_cube_array"),texture_depth_multisampled_2d:new U("texture_depth_multisampled_2d",F.keyword,"texture_depth_multisampled_2d"),texture_external:new U("texture_external",F.keyword,"texture_external"),u32:new U("u32",F.keyword,"u32"),vec2:new U("vec2",F.keyword,"vec2"),vec3:new U("vec3",F.keyword,"vec3"),vec4:new U("vec4",F.keyword,"vec4"),bitcast:new U("bitcast",F.keyword,"bitcast"),block:new U("block",F.keyword,"block"),break:new U("break",F.keyword,"break"),case:new U("case",F.keyword,"case"),continue:new U("continue",F.keyword,"continue"),continuing:new U("continuing",F.keyword,"continuing"),default:new U("default",F.keyword,"default"),diagnostic:new U("diagnostic",F.keyword,"diagnostic"),discard:new U("discard",F.keyword,"discard"),else:new U("else",F.keyword,"else"),enable:new U("enable",F.keyword,"enable"),fallthrough:new U("fallthrough",F.keyword,"fallthrough"),false:new U("false",F.keyword,"false"),fn:new U("fn",F.keyword,"fn"),for:new U("for",F.keyword,"for"),function:new U("function",F.keyword,"function"),if:new U("if",F.keyword,"if"),let:new U("let",F.keyword,"let"),const:new U("const",F.keyword,"const"),loop:new U("loop",F.keyword,"loop"),while:new U("while",F.keyword,"while"),private:new U("private",F.keyword,"private"),read:new U("read",F.keyword,"read"),read_write:new U("read_write",F.keyword,"read_write"),return:new U("return",F.keyword,"return"),requires:new U("requires",F.keyword,"requires"),storage:new U("storage",F.keyword,"storage"),switch:new U("switch",F.keyword,"switch"),true:new U("true",F.keyword,"true"),alias:new U("alias",F.keyword,"alias"),type:new U("type",F.keyword,"type"),uniform:new U("uniform",F.keyword,"uniform"),var:new U("var",F.keyword,"var"),override:new U("override",F.keyword,"override"),workgroup:new U("workgroup",F.keyword,"workgroup"),write:new U("write",F.keyword,"write"),r8unorm:new U("r8unorm",F.keyword,"r8unorm"),r8snorm:new U("r8snorm",F.keyword,"r8snorm"),r8uint:new U("r8uint",F.keyword,"r8uint"),r8sint:new U("r8sint",F.keyword,"r8sint"),r16uint:new U("r16uint",F.keyword,"r16uint"),r16sint:new U("r16sint",F.keyword,"r16sint"),r16float:new U("r16float",F.keyword,"r16float"),rg8unorm:new U("rg8unorm",F.keyword,"rg8unorm"),rg8snorm:new U("rg8snorm",F.keyword,"rg8snorm"),rg8uint:new U("rg8uint",F.keyword,"rg8uint"),rg8sint:new U("rg8sint",F.keyword,"rg8sint"),r32uint:new U("r32uint",F.keyword,"r32uint"),r32sint:new U("r32sint",F.keyword,"r32sint"),r32float:new U("r32float",F.keyword,"r32float"),rg16uint:new U("rg16uint",F.keyword,"rg16uint"),rg16sint:new U("rg16sint",F.keyword,"rg16sint"),rg16float:new U("rg16float",F.keyword,"rg16float"),rgba8unorm:new U("rgba8unorm",F.keyword,"rgba8unorm"),rgba8unorm_srgb:new U("rgba8unorm_srgb",F.keyword,"rgba8unorm_srgb"),rgba8snorm:new U("rgba8snorm",F.keyword,"rgba8snorm"),rgba8uint:new U("rgba8uint",F.keyword,"rgba8uint"),rgba8sint:new U("rgba8sint",F.keyword,"rgba8sint"),bgra8unorm:new U("bgra8unorm",F.keyword,"bgra8unorm"),bgra8unorm_srgb:new U("bgra8unorm_srgb",F.keyword,"bgra8unorm_srgb"),rgb10a2unorm:new U("rgb10a2unorm",F.keyword,"rgb10a2unorm"),rg11b10float:new U("rg11b10float",F.keyword,"rg11b10float"),rg32uint:new U("rg32uint",F.keyword,"rg32uint"),rg32sint:new U("rg32sint",F.keyword,"rg32sint"),rg32float:new U("rg32float",F.keyword,"rg32float"),rgba16uint:new U("rgba16uint",F.keyword,"rgba16uint"),rgba16sint:new U("rgba16sint",F.keyword,"rgba16sint"),rgba16float:new U("rgba16float",F.keyword,"rgba16float"),rgba32uint:new U("rgba32uint",F.keyword,"rgba32uint"),rgba32sint:new U("rgba32sint",F.keyword,"rgba32sint"),rgba32float:new U("rgba32float",F.keyword,"rgba32float"),static_assert:new U("static_assert",F.keyword,"static_assert")},O.tokens={decimal_float_literal:new U("decimal_float_literal",F.token,/((-?[0-9]*\.[0-9]+|-?[0-9]+\.[0-9]*)((e|E)(\+|-)?[0-9]+)?[fh]?)|(-?[0-9]+(e|E)(\+|-)?[0-9]+[fh]?)|(-?[0-9]+[fh])/),hex_float_literal:new U("hex_float_literal",F.token,/-?0x((([0-9a-fA-F]*\.[0-9a-fA-F]+|[0-9a-fA-F]+\.[0-9a-fA-F]*)((p|P)(\+|-)?[0-9]+[fh]?)?)|([0-9a-fA-F]+(p|P)(\+|-)?[0-9]+[fh]?))/),int_literal:new U("int_literal",F.token,/-?0x[0-9a-fA-F]+|0i?|-?[1-9][0-9]*i?/),uint_literal:new U("uint_literal",F.token,/0x[0-9a-fA-F]+u|0u|[1-9][0-9]*u/),name:new U("name",F.token,/([_\p{XID_Start}][\p{XID_Continue}]+)|([\p{XID_Start}])/u),ident:new U("ident",F.token,/[_a-zA-Z][0-9a-zA-Z_]*/),and:new U("and",F.token,"&"),and_and:new U("and_and",F.token,"&&"),arrow:new U("arrow ",F.token,"->"),attr:new U("attr",F.token,"@"),forward_slash:new U("forward_slash",F.token,"/"),bang:new U("bang",F.token,"!"),bracket_left:new U("bracket_left",F.token,"["),bracket_right:new U("bracket_right",F.token,"]"),brace_left:new U("brace_left",F.token,"{"),brace_right:new U("brace_right",F.token,"}"),colon:new U("colon",F.token,":"),comma:new U("comma",F.token,","),equal:new U("equal",F.token,"="),equal_equal:new U("equal_equal",F.token,"=="),not_equal:new U("not_equal",F.token,"!="),greater_than:new U("greater_than",F.token,">"),greater_than_equal:new U("greater_than_equal",F.token,">="),shift_right:new U("shift_right",F.token,">>"),less_than:new U("less_than",F.token,"<"),less_than_equal:new U("less_than_equal",F.token,"<="),shift_left:new U("shift_left",F.token,"<<"),modulo:new U("modulo",F.token,"%"),minus:new U("minus",F.token,"-"),minus_minus:new U("minus_minus",F.token,"--"),period:new U("period",F.token,"."),plus:new U("plus",F.token,"+"),plus_plus:new U("plus_plus",F.token,"++"),or:new U("or",F.token,"|"),or_or:new U("or_or",F.token,"||"),paren_left:new U("paren_left",F.token,"("),paren_right:new U("paren_right",F.token,")"),semicolon:new U("semicolon",F.token,";"),star:new U("star",F.token,"*"),tilde:new U("tilde",F.token,"~"),underscore:new U("underscore",F.token,"_"),xor:new U("xor",F.token,"^"),plus_equal:new U("plus_equal",F.token,"+="),minus_equal:new U("minus_equal",F.token,"-="),times_equal:new U("times_equal",F.token,"*="),division_equal:new U("division_equal",F.token,"/="),modulo_equal:new U("modulo_equal",F.token,"%="),and_equal:new U("and_equal",F.token,"&="),or_equal:new U("or_equal",F.token,"|="),xor_equal:new U("xor_equal",F.token,"^="),shift_right_equal:new U("shift_right_equal",F.token,">>="),shift_left_equal:new U("shift_left_equal",F.token,"<<=")},O.simpleTokens={"@":G.tokens.attr,"{":G.tokens.brace_left,"}":G.tokens.brace_right,":":G.tokens.colon,",":G.tokens.comma,"(":G.tokens.paren_left,")":G.tokens.paren_right,";":G.tokens.semicolon},O.literalTokens={"&":G.tokens.and,"&&":G.tokens.and_and,"->":G.tokens.arrow,"/":G.tokens.forward_slash,"!":G.tokens.bang,"[":G.tokens.bracket_left,"]":G.tokens.bracket_right,"=":G.tokens.equal,"==":G.tokens.equal_equal,"!=":G.tokens.not_equal,">":G.tokens.greater_than,">=":G.tokens.greater_than_equal,">>":G.tokens.shift_right,"<":G.tokens.less_than,"<=":G.tokens.less_than_equal,"<<":G.tokens.shift_left,"%":G.tokens.modulo,"-":G.tokens.minus,"--":G.tokens.minus_minus,".":G.tokens.period,"+":G.tokens.plus,"++":G.tokens.plus_plus,"|":G.tokens.or,"||":G.tokens.or_or,"*":G.tokens.star,"~":G.tokens.tilde,_:G.tokens.underscore,"^":G.tokens.xor,"+=":G.tokens.plus_equal,"-=":G.tokens.minus_equal,"*=":G.tokens.times_equal,"/=":G.tokens.division_equal,"%=":G.tokens.modulo_equal,"&=":G.tokens.and_equal,"|=":G.tokens.or_equal,"^=":G.tokens.xor_equal,">>=":G.tokens.shift_right_equal,"<<=":G.tokens.shift_left_equal},O.regexTokens={decimal_float_literal:G.tokens.decimal_float_literal,hex_float_literal:G.tokens.hex_float_literal,int_literal:G.tokens.int_literal,uint_literal:G.tokens.uint_literal,ident:G.tokens.ident},O.storage_class=[G.keywords.function,G.keywords.private,G.keywords.workgroup,G.keywords.uniform,G.keywords.storage],O.access_mode=[G.keywords.read,G.keywords.write,G.keywords.read_write],O.sampler_type=[G.keywords.sampler,G.keywords.sampler_comparison],O.sampled_texture_type=[G.keywords.texture_1d,G.keywords.texture_2d,G.keywords.texture_2d_array,G.keywords.texture_3d,G.keywords.texture_cube,G.keywords.texture_cube_array],O.multisampled_texture_type=[G.keywords.texture_multisampled_2d],O.storage_texture_type=[G.keywords.texture_storage_1d,G.keywords.texture_storage_2d,G.keywords.texture_storage_2d_array,G.keywords.texture_storage_3d],O.depth_texture_type=[G.keywords.texture_depth_2d,G.keywords.texture_depth_2d_array,G.keywords.texture_depth_cube,G.keywords.texture_depth_cube_array,G.keywords.texture_depth_multisampled_2d],O.texture_external_type=[G.keywords.texture_external],O.any_texture_type=[...G.sampled_texture_type,...G.multisampled_texture_type,...G.storage_texture_type,...G.depth_texture_type,...G.texture_external_type],O.texel_format=[G.keywords.r8unorm,G.keywords.r8snorm,G.keywords.r8uint,G.keywords.r8sint,G.keywords.r16uint,G.keywords.r16sint,G.keywords.r16float,G.keywords.rg8unorm,G.keywords.rg8snorm,G.keywords.rg8uint,G.keywords.rg8sint,G.keywords.r32uint,G.keywords.r32sint,G.keywords.r32float,G.keywords.rg16uint,G.keywords.rg16sint,G.keywords.rg16float,G.keywords.rgba8unorm,G.keywords.rgba8unorm_srgb,G.keywords.rgba8snorm,G.keywords.rgba8uint,G.keywords.rgba8sint,G.keywords.bgra8unorm,G.keywords.bgra8unorm_srgb,G.keywords.rgb10a2unorm,G.keywords.rg11b10float,G.keywords.rg32uint,G.keywords.rg32sint,G.keywords.rg32float,G.keywords.rgba16uint,G.keywords.rgba16sint,G.keywords.rgba16float,G.keywords.rgba32uint,G.keywords.rgba32sint,G.keywords.rgba32float],O.const_literal=[G.tokens.int_literal,G.tokens.uint_literal,G.tokens.decimal_float_literal,G.tokens.hex_float_literal,G.keywords.true,G.keywords.false],O.literal_or_ident=[G.tokens.ident,G.tokens.int_literal,G.tokens.uint_literal,G.tokens.decimal_float_literal,G.tokens.hex_float_literal,G.tokens.name],O.element_count_expression=[G.tokens.int_literal,G.tokens.uint_literal,G.tokens.ident],O.template_types=[G.keywords.vec2,G.keywords.vec3,G.keywords.vec4,G.keywords.mat2x2,G.keywords.mat2x3,G.keywords.mat2x4,G.keywords.mat3x2,G.keywords.mat3x3,G.keywords.mat3x4,G.keywords.mat4x2,G.keywords.mat4x3,G.keywords.mat4x4,G.keywords.atomic,G.keywords.bitcast,...G.any_texture_type],O.attribute_name=[G.tokens.ident,G.keywords.block,G.keywords.diagnostic],O.assignment_operators=[G.tokens.equal,G.tokens.plus_equal,G.tokens.minus_equal,G.tokens.times_equal,G.tokens.division_equal,G.tokens.modulo_equal,G.tokens.and_equal,G.tokens.or_equal,G.tokens.xor_equal,G.tokens.shift_right_equal,G.tokens.shift_left_equal],O.increment_operators=[G.tokens.plus_plus,G.tokens.minus_minus];class Ed{constructor(e,t,n,r,i){this.type=e,this.lexeme=t,this.line=n,this.start=r,this.end=i}toString(){return this.lexeme}isTemplateType(){return O.template_types.indexOf(this.type)!=-1}isArrayType(){return this.type==O.keywords.array}isArrayOrTemplateType(){return this.isArrayType()||this.isTemplateType()}}class LA{constructor(e){this._tokens=[],this._start=0,this._current=0,this._line=1,this._source=e??""}scanTokens(){for(;!this._isAtEnd();)if(this._start=this._current,!this.scanToken())throw"Invalid syntax at line "+this._line;return this._tokens.push(new Ed(O.eof,"",this._line,this._current,this._current)),this._tokens}scanToken(){let e=this._advance();if(e==`
 `)return this._line++,!0;if(this._isWhitespace(e))return!0;if(e=="/"){if(this._peekAhead()=="/"){for(;e!=`
@@ -6234,7 +6234,7 @@ It will be skipped when requesting a GPUDevice.`)),T(this,gs).requiredFeatures}s
 ${a}`,l&&(a=`${Wy}
 
 ${a}`);const u=e.CreateShaderModule(a,T(eo,cr)+" Shader Module"),c=e.CreateVertexBufferLayout(["position","texture","size"],void 0,"textVertex");return{target:e.CreateTargetState(void 0,l&&{color:o}||void 0),fragmentEntry:l?"dsbTextFragment":"textFragment",constants:{TRIPLET_FACTOR:.6},vertexEntry:"textVertex",module:u,layout:c,shader:a}}async SetFontTexture(e,t="r8unorm"){const n=new(await En.LegacyTexture()),r=n.CopyImageToTexture(e,{create:{format:t},mipmaps:!1});T(this,yo).set([r.width,r.height]),T(this,Ke).WriteBuffer(T(this,Ts),T(this,yo)),T(this,er)[0]=T(this,Ke).CreateBindGroup(T(this,Ke).CreateBindGroupEntries([n.CreateSampler({filter:"linear"}),{buffer:T(this,Ts)},{buffer:T(this,Es)},r.createView()]),0,T(eo,cr)+" Bind Group")}AddVertexBuffers(e){T(this,Tn).push(...lt(bindGroups))}AddBindGroups(e){T(this,er).push(...lt(e))}Write(e,t=[0,0]){!T(this,er)[0]&&ue(ie.FONT_TEXTURE_NOT_FOUND,"`SDFText.Write` method. Call `SDFText.SetFontTexture` method before writing any string."),j(this,ri,e),se(this,kn,s0).call(this),t=t.map(n=>-n),se(this,kn,mc).call(this,T(this,hr),t)}Render(e=!0){T(this,Ke).SavePipelineState(),T(this,Ke).SetBindGroups(T(this,er)),T(this,Ke).SetVertexBuffers(T(this,Tn)),T(this,Ke).Render(T(this,hr).length/5,e),T(this,Ke).RestorePipelineState()}Resize(){se(this,kn,El).call(this)}Destroy(){T(this,Tn).forEach(e=>e.destroy()),j(this,Ts,T(this,Ts).destroy()),j(this,Es,T(this,Es).destroy()),T(this,Tn).splice(0),T(this,er).splice(1)}set Position([e,t]){T(this,Fe).min[0]=e,T(this,Fe).min[1]=t,T(this,Fe).size[0]=T(this,Fe).max[0]-e,T(this,Fe).size[1]=T(this,Fe).max[1]-t,T(this,Fe).max[0]+=e,T(this,Fe).max[1]+=t,se(this,kn,El).call(this)}set Background(e){T(this,mo).set(e instanceof gl?e.rgba:e),T(this,Ke).WriteBuffer(T(this,Es),T(this,mo).buffer)}set Color(e){T(this,go).set(e instanceof gl?e.rgba:e),T(this,Ke).WriteBuffer(T(this,Es),T(this,go).buffer)}set Size(e){const t=T(this,ii)/T(this,rr);if(j(this,rr,Math.round(T(this,Ke).DevicePixelRatio*e)),!T(this,Tn).length)return;j(this,ii,T(this,rr)*t);const n=T(this,Fe).min.map((r,i)=>r*(-1*i+.5));se(this,kn,mc).call(this,T(this,hr),n)}get BoundingBox(){return T(this,Fe)}};cr=new WeakMap,si=new WeakMap,ri=new WeakMap,rr=new WeakMap,ii=new WeakMap,kl=new WeakMap,Il=new WeakMap,mo=new WeakMap,go=new WeakMap,Ts=new WeakMap,Es=new WeakMap,hr=new WeakMap,yo=new WeakMap,Ke=new WeakMap,Tn=new WeakMap,Ji=new WeakMap,er=new WeakMap,Fe=new WeakMap,kn=new WeakSet,n0=function(){const{buffer:s,Text:{matrix:e,textureSize:t}}=T(this,Ke).CreateUniformBuffer("Text",{label:T(_u,cr)+" Uniform Buffer"}),{buffer:n,Font:{color:r,back:i,subpx:o,hint:a}}=T(this,Ke).CreateUniformBuffer("Font",{label:T(_u,cr)+" Font Uniform Buffer"});j(this,yo,t),j(this,Ji,e),j(this,Ts,s),j(this,Es,n),o[0]=+T(this,Il),a[0]=+T(this,kl),j(this,go,r),j(this,mo,i)},s0=function(){T(this,Tn).forEach(s=>s.destroy()),T(this,Tn).splice(0),j(this,hr,new Float32Array(30*T(this,ri).length)),T(this,Tn).push(T(this,Ke).CreateVertexBuffer(T(this,hr)))},qd=function(){const{cap_height:s,ascent:e,x_height:t,descent:n,line_gap:r}=T(this,si),i=T(this,rr)/s;return{capScale:i,ascent:Math.round(e*i),lowScale:Math.round(t*i)/t,lineHeight:Math.round((e+n+r)*i+T(this,ii))}},Hd=function([s,e],t,n,r=0){const{aspect:i,ix:o,descent:a,iy:l,row_height:u}=T(this,si),{flags:c,bearing_x:h,rect:d,advance_x:w}=n,{lowScale:k,capScale:A,ascent:m}=t,S=1&c?k:A,b=i*S,f=s+b*(h+r-o),v=f+b*(d[2]-d[0]),_=e-m-S*(a+l),E=_+S*u,D=S*l*2;return{position:[s+=w*b,e],vertices:[f,E,d[0],d[1],D,v,E,d[2],d[1],D,f,_,d[0],d[3],D,f,_,d[0],d[3],D,v,E,d[2],d[1],D,v,_,d[2],d[3],D]}},El=function(){const[s,e]=T(this,Ke).CanvasSize,t=Math.round(-.5*T(this,Fe).size[0]),n=Math.round(.5*T(this,Fe).size[1]),r=2/(2*Math.round(.5*s)),i=2/(2*Math.round(.5*e));vl.set(r,0,0,0,i,0,t*r,n*i,1,T(this,Ji)),T(this,Ke).WriteBuffer(T(this,Ts),T(this,Ji).buffer)},mc=function(s,e){let t=0,n=" ",r=e,i=0,o=0;const a=se(this,kn,qd).call(this),{lineHeight:l,capScale:u}=a,{space_advance:c,chars:h,kern:d}=T(this,si);for(;!(i===T(this,ri).length||s.length<=o);){let w=T(this,ri)[i++];if(w===`
-`){t=Math.max(t,r[0]),r[1]-=l,r[0]=e[0],n=" ";continue}if(w===" "){r[0]+=c*u,n=" ";continue}let k=h[w];k||(k=h[w="?"]);const A=se(this,kn,Hd).call(this,r,a,k,d[n+w]);for(let m=0,S=A.vertices.length;m<S;++m)s[o++]=A.vertices[m];r=A.position,n=w}T(this,Fe).min[0]=e[0],T(this,Fe).min[1]=e[1],T(this,Fe).max[0]=t||r[0],T(this,Fe).max[1]=r[1]+l,T(this,Fe).size[0]=T(this,Fe).max[0]-T(this,Fe).min[0],T(this,Fe).size[1]=T(this,Fe).max[1]-T(this,Fe).min[1],T(this,Ke).WriteBuffer(T(this,Tn)[0],s),se(this,kn,El).call(this)},ee(_u,cr,"SDFText");console.info("%cUWAL v0.0.12","background:#005a9c;padding:3px;color:#fff;");class lC{unet;sampsCount=0;image;Renderer;seedBuffer;color3f;color4u;totSamps=5e3;Computation;canvas;denoiserBuffer;denoiserFreq=25;storageBufferSize;workgroupDimension;resizeTimeout;seed;context;draw=this.render.bind(this);quartSamps=this.totSamps/4;constructor(){En.OnLost=()=>{},gA("/rt_ldr.tza").then(e=>this.unet=e)}resize(e,t){clearTimeout(this.resizeTimeout),this.resizeTimeout=setTimeout(()=>{En.Destroy([this.color3f.buffer,this.color4u.buffer]),this.create(this.Renderer.Canvas,e,t),this.setOutputCanvas(this.canvas,e,t)},500)}setOutputCanvas(e,t,n){this.canvas=e,this.context=e.getContext("2d"),this.canvas.width=t,this.canvas.height=n,this.image=new ImageData(new Uint8ClampedArray(t*n*4),t,n)}async create(e,t,n){const r=Uint32Array.BYTES_PER_ELEMENT*4;return this.storageBufferSize=t*n*r,await this.checkRequiredLimits(e),this.Renderer=new(await En.Renderer(e)),this.Renderer.SetCanvasSize(t,n,!1),await this.createComputePipeline(),await this.createRenderPipeline(),requestAnimationFrame(this.draw),[t,n]}async checkRequiredLimits(e){const t=this.storageBufferSize*Uint32Array.BYTES_PER_ELEMENT*4;En.RequiredLimits={maxStorageBufferBindingSize:t},En.SetRequiredFeatures("bgra8unorm-storage");try{this.Computation=new(await En.Computation()),this.workgroupDimension=this.Computation.GetMaxEvenWorkgroupDimension(2)}catch(n){this.create(e,832,624),console.warn(n),console.warn(["Will be used a fallback with the minimum `maxStorageBufferBindingSize`","value available in all WebGPU contexts (134217728 bytes [128 MB]),","which produces a 832 x 624 pixel image."].join(" "))}}async createComputePipeline(){const e=this.createSpheres(),[t,n]=this.Renderer.CanvasSize,r=new this.Computation.Pipeline;await this.Computation.AddPipeline(r,{module:r.CreateShaderModule(`
+`){t=Math.max(t,r[0]),r[1]-=l,r[0]=e[0],n=" ";continue}if(w===" "){r[0]+=c*u,n=" ";continue}let k=h[w];k||(k=h[w="?"]);const A=se(this,kn,Hd).call(this,r,a,k,d[n+w]);for(let m=0,S=A.vertices.length;m<S;++m)s[o++]=A.vertices[m];r=A.position,n=w}T(this,Fe).min[0]=e[0],T(this,Fe).min[1]=e[1],T(this,Fe).max[0]=t||r[0],T(this,Fe).max[1]=r[1]+l,T(this,Fe).size[0]=T(this,Fe).max[0]-T(this,Fe).min[0],T(this,Fe).size[1]=T(this,Fe).max[1]-T(this,Fe).min[1],T(this,Ke).WriteBuffer(T(this,Tn)[0],s),se(this,kn,El).call(this)},ee(_u,cr,"SDFText");console.info("%cUWAL v0.0.12","background:#005a9c;padding:3px;color:#fff;");class lC{unet;sampsCount=0;image;Renderer;seedBuffer;color3f;color4u;totSamps=500;Computation;canvas;denoiserBuffer;denoiserFreq=25;storageBufferSize;workgroupDimension;resizeTimeout;seed;draw=this.render.bind(this);quartSamps=this.totSamps/4;context;constructor(){En.OnLost=()=>{},gA("/rt_ldr.tza").then(e=>this.unet=e)}resize(e,t){clearTimeout(this.resizeTimeout),this.resizeTimeout=setTimeout(()=>{En.Destroy([this.color3f.buffer,this.color4u.buffer]),this.create(this.Renderer.Canvas,e,t),this.setOutputCanvas(this.canvas,e,t),this.sampsCount=0},500)}setOutputCanvas(e,t,n){this.canvas=e,this.context=e.getContext("2d"),this.canvas.width=t,this.canvas.height=n,this.image=new ImageData(new Uint8ClampedArray(t*n*4),t,n)}async create(e,t,n){const r=Uint32Array.BYTES_PER_ELEMENT*4;return this.storageBufferSize=t*n*r,await this.checkRequiredLimits(e),this.Renderer=new(await En.Renderer(e)),this.Renderer.SetCanvasSize(t,n,!1),await this.createComputePipeline(),await this.createRenderPipeline(),requestAnimationFrame(this.draw),[t,n]}async checkRequiredLimits(e){const t=this.storageBufferSize*Uint32Array.BYTES_PER_ELEMENT*4;En.RequiredLimits={maxStorageBufferBindingSize:t},En.SetRequiredFeatures("bgra8unorm-storage");try{this.Computation=new(await En.Computation()),this.workgroupDimension=this.Computation.GetMaxEvenWorkgroupDimension(2)}catch(n){this.create(e,832,624),console.warn(n),console.warn(["Will be used a fallback with the minimum `maxStorageBufferBindingSize`","value available in all WebGPU contexts (134217728 bytes [128 MB]),","which produces a 832 x 624 pixel image."].join(" "))}}async createComputePipeline(){const e=this.createSpheres(),[t,n]=this.Renderer.CanvasSize,r=new this.Computation.Pipeline;await this.Computation.AddPipeline(r,{module:r.CreateShaderModule(`
                 const SPHERES = ${e.length}u;
                 ${yA}
-            `),constants:{DIMENSION_SIZE:this.workgroupDimension,SAMPLES:4/this.totSamps}});const{seed:i,buffer:o}=r.CreateUniformBuffer("seed");this.color3f=r.CreateStorageBuffer("color3f",this.storageBufferSize*.75),this.denoiserBuffer=r.CreateReadableBuffer(this.storageBufferSize),this.color4u=r.CreateStorageBuffer("color4u",{length:this.storageBufferSize,usage:GPUBufferUsage.COPY_SRC});const{spheres:a,buffer:l}=r.CreateStorageBuffer("spheres",e.length);for(let u=0,c=0;u<e.length;u++,c=u*12)a[u].p.set(e[u].p,c+0),a[u].rad.set(e[u].rad,c+3),a[u].e.set(e[u].e,c+4),a[u].refl.set(e[u].refl,c+7),a[u].c.set(e[u].c,c+8);this.Computation.WriteBuffer(l,a[0].p.buffer),this.seedBuffer=o,this.seed=i,r.SetBindGroups(r.CreateBindGroup(r.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.seedBuffer,this.color3f.buffer,this.color4u.buffer,l]))),this.Computation.Workgroups=[t/this.workgroupDimension,n/this.workgroupDimension]}async createRenderPipeline(){const e=new this.Renderer.Pipeline;await this.Renderer.AddPipeline(e,e.CreateShaderModule([Od.Resolution,Od.Quad,bA])),e.SetBindGroups(e.CreateBindGroup(e.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.color4u.buffer]))),e.SetDrawParams(6)}async render(){this.updateSeedAndSampsBuffer(),this.Computation.Compute(!1),this.Computation.CopyBufferToBuffer(this.color4u.buffer,this.denoiserBuffer),this.Computation.Submit(),this.Renderer.Render(),++this.sampsCount%this.denoiserFreq||await this.denoise(),this.sampsCount<this.quartSamps&&requestAnimationFrame(this.draw)}updateSeedAndSampsBuffer(){this.seed[0]=Math.random()*4294967295,this.seed[1]=Math.random()*4294967295,this.seed[2]=Math.random()*4294967295,this.Computation.WriteBuffer(this.seedBuffer,this.seed)}async denoise(){await this.denoiserBuffer.mapAsync(GPUMapMode.READ),this.image.data.set(new Uint32Array(this.denoiserBuffer.getMappedRange())),this.denoiserBuffer.unmap();const e=this.context;this.unet.tileExecute({done(){},color:this.image,progress:(t,n,r)=>n&&e.putImageData(n,r.x,r.y)})}createSpheres(){return[{p:[998,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.2,.2]},{p:[-898,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.2,.8]},{p:[50,40.8,1e3],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.8,.2]},{p:[50,40.8,-830],rad:[1e3],e:[0,0,0],refl:[0],c:[0,0,0]},{p:[50,1e3,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[50,-1e3+81.6+4.2,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[27,16.5,47],rad:[16.5],e:[0,0,0],refl:[1],c:[.999,.999,.999]},{p:[73,16.5,78],rad:[16.5],e:[0,0,0],refl:[2],c:[.999,.999,.999]},{p:[50,68.16-.27+74.2,81.6],rad:[60],e:[12,12,12],refl:[0],c:[0,0,0]}]}}const vu=new lC;self.onmessage=async({data:s})=>{const{width:e,height:t}=s;switch(s.action){case"Transfer::WebGPU":const[n,r]=await vu.create(s.canvas,e,t);(e!==n||t!==r)&&self.postMessage({width:n,height:r});break;case"Transfer::2D":return vu.setOutputCanvas(s.canvas,e,t);case"Resize::Window":return vu.resize(e,t)}};self.onerror=console.error;
+            `),constants:{DIMENSION_SIZE:this.workgroupDimension,SAMPLES:4/this.totSamps}});const{seed:i,buffer:o}=r.CreateUniformBuffer("seed");this.color3f=r.CreateStorageBuffer("color3f",this.storageBufferSize*.75),this.denoiserBuffer=r.CreateReadableBuffer(this.storageBufferSize),this.color4u=r.CreateStorageBuffer("color4u",{length:this.storageBufferSize,usage:GPUBufferUsage.COPY_SRC});const{spheres:a,buffer:l}=r.CreateStorageBuffer("spheres",e.length);for(let u=0,c=0;u<e.length;u++,c=u*12)a[u].p.set(e[u].p,c+0),a[u].rad.set(e[u].rad,c+3),a[u].e.set(e[u].e,c+4),a[u].refl.set(e[u].refl,c+7),a[u].c.set(e[u].c,c+8);this.Computation.WriteBuffer(l,a[0].p.buffer),this.seedBuffer=o,this.seed=i,r.SetBindGroups(r.CreateBindGroup(r.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.seedBuffer,this.color3f.buffer,this.color4u.buffer,l]))),this.Computation.Workgroups=[t/this.workgroupDimension,n/this.workgroupDimension]}async createRenderPipeline(){const e=new this.Renderer.Pipeline;await this.Renderer.AddPipeline(e,e.CreateShaderModule([Od.Resolution,Od.Quad,bA])),e.SetBindGroups(e.CreateBindGroup(e.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.color4u.buffer]))),e.SetDrawParams(6)}async render(){this.updateSeedAndSampsBuffer(),this.Computation.Compute(!1),this.Computation.CopyBufferToBuffer(this.color4u.buffer,this.denoiserBuffer),this.Computation.Submit(),this.Renderer.Render(),++this.sampsCount%this.denoiserFreq||await this.denoise(),this.sampsCount<this.quartSamps&&requestAnimationFrame(this.draw)}updateSeedAndSampsBuffer(){this.seed[0]=Math.random()*4294967295,this.seed[1]=Math.random()*4294967295,this.seed[2]=Math.random()*4294967295,this.Computation.WriteBuffer(this.seedBuffer,this.seed)}async denoise(){await this.denoiserBuffer.mapAsync(GPUMapMode.READ),this.image.data.set(new Uint32Array(this.denoiserBuffer.getMappedRange())),this.denoiserBuffer.unmap();const e=this.context;this.unet.tileExecute({done:t=>e.putImageData(t,0,0),color:this.image})}createSpheres(){return[{p:[998,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.2,.2]},{p:[-898,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.2,.8]},{p:[50,40.8,1e3],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.8,.2]},{p:[50,40.8,-830],rad:[1e3],e:[0,0,0],refl:[0],c:[0,0,0]},{p:[50,1e3,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[50,-1e3+81.6+4.2,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[27,16.5,47],rad:[16.5],e:[0,0,0],refl:[1],c:[.999,.999,.999]},{p:[73,16.5,78],rad:[16.5],e:[0,0,0],refl:[2],c:[.999,.999,.999]},{p:[50,68.16-.27+74.2,81.6],rad:[60],e:[12,12,12],refl:[0],c:[0,0,0]}]}}const vu=new lC;self.onmessage=async({data:s})=>{const{width:e,height:t}=s;switch(s.action){case"Transfer::WebGPU":const[n,r]=await vu.create(s.canvas,e,t);(e!==n||t!==r)&&self.postMessage({width:n,height:r});break;case"Transfer::2D":return vu.setOutputCanvas(s.canvas,e,t);case"Resize::Window":return vu.resize(e,t)}};self.onerror=console.error;
