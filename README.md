@@ -1,8 +1,8 @@
-# Smallpt WebGPU
+# UWAL | WebGPU Smallpt
 
 _WebGPU port of **smallpt**: Global Illumination in 99 lines of C++ by [Kevin Beason](https://kevinbeason.com/)._
 
-[![](./public/preview.jpg)](https://ustymukhman.github.io/smallpt-webgpu/dist/)
+[![](./public/preview.jpg)](https://ustymukhman.github.io/uwal-webgpu-smallpt/dist/)
 
 # Introduction
 
@@ -27,8 +27,8 @@ Moreover, other than running on the GPU instead of the CPU like the original C++
 ## Download
 
 ```bash
-git clone https://github.com/UstymUkhman/smallpt-webgpu.git
-cd smallpt-webgpu
+git clone https://github.com/UstymUkhman/uwal-webgpu-smallpt.git
+cd uwal-webgpu-smallpt
 ```
 
 ## Develop
