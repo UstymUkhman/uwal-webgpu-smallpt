@@ -5912,271 +5912,271 @@ else {
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * =============================================================================
- */function yk(s){const{inputs:e,backend:t,attrs:n}=s,{axis:r}=n,i=Ar(r,e[0].shape)[0],o=e.map(u=>u.shape);lx(o,i);const a=wr(e.map(u=>u.shape),i);if(he(a)===0)return t.makeTensorInfo(a,e[0].dtype,[]);const l=e.filter(u=>he(u.shape)>0);return l.length===1?Wn({inputs:{x:l[0]},backend:t}):ar(l,i,t)}const bk={kernelName:gh,backendName:"webgpu",kernelFunc:yk},wk=[z_,j_,aS,XI,lk,hk,bk,V_];for(const s of wk)ry({...s,backendName:"webgpu-oidn"});async function xk(){try{const s={powerPreference:"high-performance"},e=await navigator.gpu.requestAdapter(s),t={},n=[];e.features.has("timestamp-query")&&n.push("timestamp-query"),e.features.has("bgra8unorm-storage")&&n.push(["bgra8unorm-storage"]),t.requiredFeatures=n;const r=e.limits;t.requiredLimits={maxComputeWorkgroupStorageSize:r.maxComputeWorkgroupStorageSize,maxComputeWorkgroupsPerDimension:r.maxComputeWorkgroupsPerDimension,maxStorageBufferBindingSize:r.maxStorageBufferBindingSize,maxBufferSize:r.maxBufferSize,maxComputeWorkgroupSizeX:r.maxComputeWorkgroupSizeX,maxComputeInvocationsPerWorkgroup:r.maxComputeInvocationsPerWorkgroup};const i=await e.requestDevice(t),o=e.info??await e.requestAdapterInfo?.();return vk(i,o)}catch{}}async function vk(s,e){let t=H.findBackend("webgpu-oidn");return t!=null||(t=new Ur(s,e),H.registerBackend("webgpu-oidn",()=>t),await H.setBackend("webgpu-oidn")),t}async function _k(s,e,t){const n=await xk(),r=mm(s);return new y_(r,n,t)}async function Sk(s,e,t){return fetch(s).then(n=>n.arrayBuffer()).then(n=>_k(n,e,t))}var Ik=`const EPS = 1e-4;\r
-const INF = 1e20f;\r
-alias Refl_t = u32;\r
-\r
-const DIFF: Refl_t = 0;\r
-const SPEC: Refl_t = 1;\r
-const REFR: Refl_t = 2;\r
-\r
-var<private> rnd: vec3u;\r
-const M_PI = radians(180);\r
-const M_1_PI = 1.0 / M_PI;\r
-\r
-override SAMPLES: f32 = 1.0;\r
-const GAMMA = vec3f(1 / 2.2);\r
-override DIMENSION_SIZE = 16u;\r
-\r
-struct Sphere\r
-{\r
-    p: vec3f, rad: f32,\r
-    e: vec3f, refl: Refl_t, c: vec3f\r
-};\r
-\r
-struct Ray { o: vec3f, d: vec3f };\r
-\r
-fn init_rnd(id: vec3u, seed: vec3u)\r
-{\r
-    const A = vec3(\r
-        1741651 * 1009,\r
-        140893 * 1609 * 13,\r
-        6521 * 983 * 7 * 2\r
-    );\r
-\r
-    rnd = (id * A) ^ seed;\r
-}\r
-\r
-fn rand() -> f32\r
-{\r
-    const C = vec3(\r
-        60493 * 9377,\r
-        11279 * 2539 * 23,\r
-        7919 * 631 * 5 * 3\r
-    );\r
-\r
-    rnd = (rnd * C) ^ (rnd.yzx >> vec3(4u));\r
-    return f32(rnd.x ^ rnd.y) / f32(0xffffffff);\r
-}\r
-\r
-fn intersect_sphere(s: Sphere, r: Ray) -> f32\r
-{\r
-    let op = s.p - r.o;\r
-    let b = dot(op, r.d);\r
-\r
-    var det = b * b - dot(op, op) + s.rad * s.rad;\r
-\r
-    if (det < 0) { return 0; }\r
-    else { det = sqrt(det); }\r
-\r
-    var t = b - det;\r
-\r
-    if (t > EPS) { return t; }\r
-    else\r
-    {\r
-        t = b + det;\r
-        return select(0, t, t > EPS);\r
-    }\r
-}\r
-\r
-fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool\r
-{\r
-    *t = INF;\r
-\r
-    for (var s = i32(SPHERES - 1); s > -1; s--)\r
-    {\r
-        let d = intersect_sphere(spheres[s], r);\r
-\r
-        if (d != 0f && d < *t)\r
-        {\r
-            *t = d;\r
-            *id = s;\r
-        }\r
-    }\r
-\r
-    return *t < INF;\r
-}\r
-\r
-fn radiance(ray: Ray, depth: u32) -> vec3f\r
-{\r
-    var E = 1;\r
-    var t: f32;\r
-    var id = 0;\r
-\r
-    var r = ray;\r
-    var d = depth;\r
-\r
-    var e = vec3f(0);\r
-    var cl = vec3f(0);\r
-    var cf = vec3f(1);\r
-\r
-    loop\r
-    {\r
-        if (!intersect(r, &t, &id)) { return cl; }\r
-\r
-        let obj = spheres[id];\r
-\r
-        let x = r.o + r.d * t;\r
-        let n = normalize(x - obj.p);\r
-        let nl = select(-n, n, dot(n, r.d) < 0);\r
-        var f = obj.c;\r
-\r
-        let p = max(max(f.x, f.y), f.z);\r
-        cl += cf * (obj.e * f32(E) + e);\r
-\r
-        d++;\r
-        if (d > 5 || p == 0)\r
-        {\r
-            if (rand() < p) { f *= (1 / p); }\r
-            else { return cl; }\r
-        }\r
-\r
-        cf *= f;\r
-\r
-        if (obj.refl == DIFF)\r
-        {\r
-            let r1 = 2 * M_PI * rand();\r
-            let r2 = rand();\r
-            let r2s = sqrt(r2);\r
-\r
-            let w = nl;\r
-            let u = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(w.x) > 0.1), w));\r
-            let v = cross(w, u);\r
-\r
-            let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));\r
-\r
-            e = vec3f(0);\r
-            for (var i = 0; i < i32(SPHERES); i++)\r
-            {\r
-                let s = spheres[i];\r
-\r
-                if (s.e.x <= 0 && s.e.y <= 0 && s.e.z <= 0) { continue; }\r
-\r
-                let sw = s.p - x;\r
-                // \`abs(w.x) > 0.1\` was replaced by \`abs(w.x) > EPS\` to fix the vertical line artifact:\r
-                let su = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(sw.x) > EPS), sw));\r
-                let sv = cross(sw, su);\r
-\r
-                let cos_a_max = sqrt(1 - s.rad * s.rad / dot(x - s.p, x - s.p));\r
-\r
-                let eps1 = rand();\r
-                let eps2 = rand();\r
-\r
-                let cos_a = 1 - eps1 + eps1 * cos_a_max;\r
-                let sin_a = sqrt(1 - cos_a * cos_a);\r
-                let phi = 2 * M_PI * eps2;\r
-\r
-                let l = normalize(su * cos(phi) * sin_a + sv * sin(phi) * sin_a + sw * cos_a);\r
-\r
-                if (intersect(Ray(x, l), &t, &id) && id == i)\r
-                {\r
-                    let omega = 2 * M_PI * (1 - cos_a_max);\r
-                    e += f * (s.e * dot(l, nl) * omega) * M_1_PI;\r
-                }\r
-            }\r
-\r
-            r = Ray(x, d);\r
-            E = 0;\r
-            continue;\r
-        }\r
-        else if (obj.refl == SPEC)\r
-        {\r
-            r = Ray(x, r.d - n * 2 * dot(n, r.d));\r
-            continue;\r
-        }\r
-\r
-        let reflRay = Ray(x, r.d - n * 2 * dot(n, r.d));\r
-        let into = dot(n, nl) > 0;\r
-\r
-        let nc = 1f;\r
-        let nt = 1.5;\r
-        let nnt = select(nt / nc, nc / nt, into);\r
-        let ddn = dot(r.d, nl);\r
-\r
-        let cos2t = 1 - nnt * nnt * (1 - ddn * ddn);\r
-\r
-        if (cos2t < 0)\r
-        {\r
-            r = reflRay;\r
-            continue;\r
-        }\r
-\r
-        let tdir = normalize(r.d * nnt - n * select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t)));\r
-\r
-        let a = nt - nc;\r
-        let b = nt + nc;\r
-        let R0 = a * a / (b * b);\r
-        let c = 1 - select(dot(tdir, n), -ddn, into);\r
-\r
-        let Re = R0 + (1 - R0) * c * c * c * c * c;\r
-        let Tr = 1 - Re;\r
-        let P = 0.25 + 0.5 * Re;\r
-        let RP = Re / P;\r
-        let TP = Tr / (1 - P);\r
-\r
-        if (rand() < P)\r
-        {\r
-            cf *= RP;\r
-            r = reflRay;\r
-        }\r
-        else\r
-        {\r
-            cf *= TP;\r
-            r = Ray(x, tdir);\r
-        }\r
-\r
-        continue;\r
-    }\r
-}\r
-\r
-@group(0) @binding(0) var<uniform> res: vec3f;\r
-@group(0) @binding(1) var<uniform> seed: vec3u;\r
-@group(0) @binding(2) var<storage, read_write> color3f: array<vec3f>;\r
-@group(0) @binding(3) var<storage, read_write> color4u: array<vec4u>;\r
-@group(0) @binding(4) var<storage, read> spheres: array<Sphere, SPHERES>;\r
-\r
-@compute @workgroup_size(DIMENSION_SIZE, DIMENSION_SIZE)\r
-fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)\r
-{\r
-    let coord = vec2f(globalInvocation.xy);\r
-    init_rnd(globalInvocation, seed);\r
-\r
-    if (all(coord < res.xy))\r
-    {\r
-        let cam = Ray(\r
-            vec3f(50, 52, 295.6),\r
-            normalize(vec3f(0, -0.042612, -1))\r
-        );\r
-\r
-        let iy = res.y - coord.y - 1;\r
-        let i = u32(coord.x + iy * res.x);\r
-\r
-        let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);\r
-        let cy = normalize(cross(cx, cam.d)) * 0.5135;\r
-\r
-        for (var sy = 0u; sy < 2; sy++)\r
-        {\r
-            for (var sx = 0u; sx < 2; sx++)\r
-            {\r
-                let r1 = rand() * 2;\r
-                let r2 = rand() * 2;\r
-\r
-                let dx = select(1 - sqrt(2 - r1), sqrt(r1) - 1, r1 < 1);\r
-                let dy = select(1 - sqrt(2 - r2), sqrt(r2) - 1, r2 < 1);\r
-\r
-                var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +\r
-                        cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;\r
-\r
-                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * SAMPLES;\r
-                color3f[i] = color3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;\r
-            }\r
-        }\r
-\r
-        color4u[i] = vec4u(vec3u(\r
-            pow(clamp(color3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5\r
-        ), 255);\r
-    }\r
-}\r
+ */function yk(s){const{inputs:e,backend:t,attrs:n}=s,{axis:r}=n,i=Ar(r,e[0].shape)[0],o=e.map(u=>u.shape);lx(o,i);const a=wr(e.map(u=>u.shape),i);if(he(a)===0)return t.makeTensorInfo(a,e[0].dtype,[]);const l=e.filter(u=>he(u.shape)>0);return l.length===1?Wn({inputs:{x:l[0]},backend:t}):ar(l,i,t)}const bk={kernelName:gh,backendName:"webgpu",kernelFunc:yk},wk=[z_,j_,aS,XI,lk,hk,bk,V_];for(const s of wk)ry({...s,backendName:"webgpu-oidn"});async function xk(){try{const s={powerPreference:"high-performance"},e=await navigator.gpu.requestAdapter(s),t={},n=[];e.features.has("timestamp-query")&&n.push("timestamp-query"),e.features.has("bgra8unorm-storage")&&n.push(["bgra8unorm-storage"]),t.requiredFeatures=n;const r=e.limits;t.requiredLimits={maxComputeWorkgroupStorageSize:r.maxComputeWorkgroupStorageSize,maxComputeWorkgroupsPerDimension:r.maxComputeWorkgroupsPerDimension,maxStorageBufferBindingSize:r.maxStorageBufferBindingSize,maxBufferSize:r.maxBufferSize,maxComputeWorkgroupSizeX:r.maxComputeWorkgroupSizeX,maxComputeInvocationsPerWorkgroup:r.maxComputeInvocationsPerWorkgroup};const i=await e.requestDevice(t),o=e.info??await e.requestAdapterInfo?.();return vk(i,o)}catch{}}async function vk(s,e){let t=H.findBackend("webgpu-oidn");return t!=null||(t=new Ur(s,e),H.registerBackend("webgpu-oidn",()=>t),await H.setBackend("webgpu-oidn")),t}async function _k(s,e,t){const n=await xk(),r=mm(s);return new y_(r,n,t)}async function Sk(s,e,t){return fetch(s).then(n=>n.arrayBuffer()).then(n=>_k(n,e,t))}var Ik=`const EPS = 1e-4;
+const INF = 1e20f;
+alias Refl_t = u32;
+
+const DIFF: Refl_t = 0;
+const SPEC: Refl_t = 1;
+const REFR: Refl_t = 2;
+
+var<private> rnd: vec3u;
+const M_PI = radians(180);
+// const M_1_PI = 1.0 / M_PI;
+
+override SAMPLES: f32 = 1.0;
+const GAMMA = vec3f(1 / 2.2);
+override DIMENSION_SIZE = 16u;
+
+struct Sphere
+{
+    p: vec3f, rad: f32,
+    e: vec3f, refl: Refl_t, c: vec3f
+};
+
+struct Ray { o: vec3f, d: vec3f };
+
+fn init_rnd(id: vec3u, seed: vec3u)
+{
+    const A = vec3(
+        1741651 * 1009,
+        140893 * 1609 * 13,
+        6521 * 983 * 7 * 2
+    );
+
+    rnd = (id * A) ^ seed;
+}
+
+fn rand() -> f32
+{
+    const C = vec3(
+        60493 * 9377,
+        11279 * 2539 * 23,
+        7919 * 631 * 5 * 3
+    );
+
+    rnd = (rnd * C) ^ (rnd.yzx >> vec3(4u));
+    return f32(rnd.x ^ rnd.y) / f32(0xffffffff);
+}
+
+fn intersect_sphere(s: Sphere, r: Ray) -> f32
+{
+    let op = s.p - r.o;
+    let b = dot(op, r.d);
+
+    var det = b * b - dot(op, op) + s.rad * s.rad;
+
+    if (det < 0) { return 0; }
+    else { det = sqrt(det); }
+
+    var t = b - det;
+
+    if (t > EPS) { return t; }
+    else
+    {
+        t = b + det;
+        return select(0, t, t > EPS);
+    }
+}
+
+fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool
+{
+    *t = INF;
+
+    for (var s = i32(SPHERES - 1); s > -1; s--)
+    {
+        let d = intersect_sphere(spheres[s], r);
+
+        if (d != 0f && d < *t)
+        {
+            *t = d;
+            *id = s;
+        }
+    }
+
+    return *t < INF;
+}
+
+fn radiance(ray: Ray, depth: u32) -> vec3f
+{
+    // var E = 1;
+    var t: f32;
+    var id = 0;
+
+    var r = ray;
+    var d = depth;
+
+    // var e = vec3f(0);
+    var cl = vec3f(0);
+    var cf = vec3f(1);
+
+    loop
+    {
+        if (!intersect(r, &t, &id)) { return cl; }
+
+        let obj = spheres[id];
+
+        let x = r.o + r.d * t;
+        let n = normalize(x - obj.p);
+        let nl = select(-n, n, dot(n, r.d) < 0);
+        var f = obj.c;
+
+        let p = max(max(f.x, f.y), f.z);
+        cl += cf * (obj.e /* * f32(E) + e */);
+
+        d++;
+        if (d > 5 /* || p == 0 */)
+        {
+            if (rand() < p) { f *= (1 / p); }
+            else { return cl; }
+        }
+
+        cf *= f;
+
+        if (obj.refl == DIFF)
+        {
+            let r1 = 2 * M_PI * rand();
+            let r2 = rand();
+            let r2s = sqrt(r2);
+
+            let w = nl;
+            let u = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(w.x) > 0.1), w));
+            let v = cross(w, u);
+
+            let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));
+
+            /* e = vec3f(0);
+            for (var i = 0; i < i32(SPHERES); i++)
+            {
+                let s = spheres[i];
+
+                if (s.e.x <= 0 && s.e.y <= 0 && s.e.z <= 0) { continue; }
+
+                let sw = s.p - x;
+                // \`abs(w.x) > 0.1\` was replaced by \`abs(w.x) > EPS\` to fix the vertical line artifact:
+                let su = normalize(cross(select(vec3f(1, 0, 0), vec3f(0, 1, 0), abs(sw.x) > EPS), sw));
+                let sv = cross(sw, su);
+
+                let cos_a_max = sqrt(1 - s.rad * s.rad / dot(x - s.p, x - s.p));
+
+                let eps1 = rand();
+                let eps2 = rand();
+
+                let cos_a = 1 - eps1 + eps1 * cos_a_max;
+                let sin_a = sqrt(1 - cos_a * cos_a);
+                let phi = 2 * M_PI * eps2;
+
+                let l = normalize(su * cos(phi) * sin_a + sv * sin(phi) * sin_a + sw * cos_a);
+
+                if (intersect(Ray(x, l), &t, &id) && id == i)
+                {
+                    let omega = 2 * M_PI * (1 - cos_a_max);
+                    e += f * (s.e * dot(l, nl) * omega) * M_1_PI;
+                }
+            } */
+
+            r = Ray(x, d);
+            // E = 0;
+            continue;
+        }
+        else if (obj.refl == SPEC)
+        {
+            r = Ray(x, r.d - n * 2 * dot(n, r.d));
+            continue;
+        }
+
+        let reflRay = Ray(x, r.d - n * 2 * dot(n, r.d));
+        let into = dot(n, nl) > 0;
+
+        let nc = 1f;
+        let nt = 1.5;
+        let nnt = select(nt / nc, nc / nt, into);
+        let ddn = dot(r.d, nl);
+
+        let cos2t = 1 - nnt * nnt * (1 - ddn * ddn);
+
+        if (cos2t < 0)
+        {
+            r = reflRay;
+            continue;
+        }
+
+        let tdir = normalize(r.d * nnt - n * select(-1f, 1f, into) * (ddn * nnt + sqrt(cos2t)));
+
+        let a = nt - nc;
+        let b = nt + nc;
+        let R0 = a * a / (b * b);
+        let c = 1 - select(dot(tdir, n), -ddn, into);
+
+        let Re = R0 + (1 - R0) * c * c * c * c * c;
+        let Tr = 1 - Re;
+        let P = 0.25 + 0.5 * Re;
+        let RP = Re / P;
+        let TP = Tr / (1 - P);
+
+        if (rand() < P)
+        {
+            cf *= RP;
+            r = reflRay;
+        }
+        else
+        {
+            cf *= TP;
+            r = Ray(x, tdir);
+        }
+
+        continue;
+    }
+}
+
+@group(0) @binding(0) var<uniform> res: vec3f;
+@group(0) @binding(1) var<uniform> seed: vec3u;
+@group(0) @binding(2) var<storage, read_write> color3f: array<vec3f>;
+@group(0) @binding(3) var<storage, read_write> color4u: array<vec4u>;
+@group(0) @binding(4) var<storage, read> spheres: array<Sphere, SPHERES>;
+
+@compute @workgroup_size(DIMENSION_SIZE, DIMENSION_SIZE)
+fn compute(@builtin(global_invocation_id) globalInvocation: vec3u)
+{
+    let coord = vec2f(globalInvocation.xy);
+    init_rnd(globalInvocation, seed);
+
+    if (all(coord < res.xy))
+    {
+        let cam = Ray(
+            vec3f(50, 52, 295.6),
+            normalize(vec3f(0, -0.042612, -1))
+        );
+
+        let iy = res.y - coord.y - 1;
+        let i = u32(coord.x + iy * res.x);
+
+        let cx = vec3f(res.x * 0.5135 / res.y, 0, 0);
+        let cy = normalize(cross(cx, cam.d)) * 0.5135;
+
+        for (var sy = 0u; sy < 2; sy++)
+        {
+            for (var sx = 0u; sx < 2; sx++)
+            {
+                let r1 = rand() * 2;
+                let r2 = rand() * 2;
+
+                let dx = select(1 - sqrt(2 - r1), sqrt(r1) - 1, r1 < 1);
+                let dy = select(1 - sqrt(2 - r2), sqrt(r2) - 1, r2 < 1);
+
+                var d = cx * (((f32(sx) + 0.5 + dx) / 2 + coord.x) / res.x - 0.5) +
+                        cy * (((f32(sy) + 0.5 + dy) / 2 + coord.y) / res.y - 0.5) + cam.d;
+
+                let r = radiance(Ray(cam.o + d * 140, normalize(d)), 0) * SAMPLES;
+                color3f[i] = color3f[i] + clamp(r, vec3f(0), vec3f(1)) * 0.25;
+            }
+        }
+
+        color4u[i] = vec4u(vec3u(
+            pow(clamp(color3f[i], vec3f(0), vec3f(1)), GAMMA) * 255 + 0.5
+        ), 255);
+    }
+}
 `,kk=`struct VertexOutput\r
 {\r
     @builtin(position) position: vec4f,\r
@@ -6230,4 +6230,4 @@ ${tm}`,Yc=Object.freeze(Object.defineProperty({__proto__:null,Empty:Yl,Mipmaps:Q
 It will be skipped when requesting a GPUDevice.`)),this.#i.requiredFeatures}static set RequiredLimits(e){this.#i.requiredLimits=e}static get PreferredCanvasFormat(){return!navigator.gpu&&ie(te.WEBGPU_NOT_SUPPORTED),navigator.gpu.getPreferredCanvasFormat()}static get Adapter(){return(async()=>this.#e??await this.#u()())()}static get GPUDevice(){return(async()=>this.#t??await this.#o()())()}static set OnDeviceLost(e){this.OnLost=e}static get OnDeviceLost(){return this.OnLost}static get Device(){return this.GPUDevice}static get VERSION(){return"0.1.1"}}function Pe(s){for(let e in s)s[e]={value:s[e]};return Object.freeze(Object.create(null,s))}function im(s){switch(s){case 2:return"unorm8x2";case 4:return"float32";case 8:return"float32x2";case 12:return"float32x3";case 16:return"float32x4"}}function om(s){switch(s){case"uint8x2":case"sint8x2":case"unorm8x2":case"snorm8x2":return 2;case"uint32":case"sint32":case"float32":case"uint8x4":case"sint8x4":case"unorm8x4":case"snorm8x4":case"uint16x2":case"sint16x2":case"unorm16x2":case"snorm16x2":case"float16x2":return 4;case"uint16x4":case"sint16x4":case"uint32x2":case"sint32x2":case"unorm16x4":case"snorm16x4":case"float16x4":case"float32x2":return 8;case"uint32x3":case"sint32x3":case"float32x3":return 12;case"uint32x4":case"sint32x4":case"float32x4":return 16}return 0}function am(s){return s==="f16"||s.includes("h")?"f16":s.includes("f")?"f32":s.includes("u")?"u32":"i32"}function lm(s){return+s.slice(1)/8}function um(s){return s==="f16"&&ie(te.FORMAT_NOT_SUPPORTED,`${s}.`),s==="f32"?Float32Array:s==="u32"?Uint32Array:Int32Array}function ut(s){return Array.isArray(s)&&s||[s]}function cm(s){return s instanceof Co?s.rgba:s}function No(s){return s instanceof GPUShaderModule&&s||s.module}Pe({TRIANGLE:3,SQUARE:4,PENTAGON:5,HEXAGON:6,HEPTAGON:7,OCTAGON:8,NONAGON:9,DECAGON:10,DODECAGON:12});console.info("%cUWAL v0.1.1","background:#005a9c;padding:3px;color:#fff;");class bT{unet;sampsCount=0;image;Renderer;seedBuffer;color3f;color4u;totSamps=500;Computation;canvas;denoiserBuffer;denoiserFreq=25;storageBufferSize;workgroupDimension;resizeTimeout;seed;draw=this.render.bind(this);quartSamps=this.totSamps/4;context;constructor(){zt.OnLost=()=>{},Sk(Tk).then(e=>this.unet=e)}resize(e,t){clearTimeout(this.resizeTimeout),this.resizeTimeout=setTimeout(()=>{zt.Destroy([this.color3f.buffer,this.color4u.buffer]),this.create(this.Renderer.Canvas,e,t),this.setOutputCanvas(this.canvas,e,t),this.sampsCount=0},500)}setOutputCanvas(e,t,n){this.canvas=e,this.context=e.getContext("2d"),this.canvas.width=t,this.canvas.height=n,this.image=new ImageData(new Uint8ClampedArray(t*n*4),t,n)}async create(e,t,n){const r=Uint32Array.BYTES_PER_ELEMENT*4;return this.storageBufferSize=t*n*r,await this.checkRequiredLimits(e),this.Renderer=new(await zt.Renderer(e)),this.Renderer.SetCanvasSize(t,n,!1),await this.createComputePipeline(),await this.createRenderPipeline(),requestAnimationFrame(this.draw),[t,n]}async checkRequiredLimits(e){const t=this.storageBufferSize*Uint32Array.BYTES_PER_ELEMENT*4;zt.RequiredLimits={maxStorageBufferBindingSize:t},zt.SetRequiredFeatures("bgra8unorm-storage");try{this.Computation=new(await zt.Computation()),this.workgroupDimension=this.Computation.GetMaxEvenWorkgroupDimension(2)}catch(n){this.create(e,832,624),console.warn(n),console.warn(["Will be used a fallback with the minimum `maxStorageBufferBindingSize`","value available in all WebGPU contexts (134217728 bytes [128 MB]),","which produces a 832 x 624 pixel image."].join(" "))}}async createComputePipeline(){const e=this.createSpheres(),[t,n]=this.Renderer.CanvasSize,r=new this.Computation.Pipeline;await this.Computation.AddPipeline(r,{module:r.CreateShaderModule(`
                 const SPHERES = ${e.length}u;
                 ${Ik}
-            `),constants:{DIMENSION_SIZE:this.workgroupDimension,SAMPLES:4/this.totSamps}});const{seed:i,buffer:o}=r.CreateUniformBuffer("seed");this.color3f=r.CreateStorageBuffer("color3f",this.storageBufferSize*.75),this.denoiserBuffer=r.CreateReadableBuffer(this.storageBufferSize),this.color4u=r.CreateStorageBuffer("color4u",{length:this.storageBufferSize,usage:GPUBufferUsage.COPY_SRC});const{spheres:a,buffer:l}=r.CreateStorageBuffer("spheres",e.length);for(let u=0,c=0;u<e.length;u++,c=u*12)a[u].p.set(e[u].p,c+0),a[u].rad.set(e[u].rad,c+3),a[u].e.set(e[u].e,c+4),a[u].refl.set(e[u].refl,c+7),a[u].c.set(e[u].c,c+8);this.Computation.WriteBuffer(l,a[0].p.buffer),this.seedBuffer=o,this.seed=i,r.SetBindGroups(r.CreateBindGroup(r.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.seedBuffer,this.color3f.buffer,this.color4u.buffer,l]))),this.Computation.Workgroups=[t/this.workgroupDimension,n/this.workgroupDimension]}async createRenderPipeline(){const e=new this.Renderer.Pipeline;await this.Renderer.AddPipeline(e,e.CreateShaderModule([Yc.Resolution,Yc.Quad,kk])),e.SetBindGroups(e.CreateBindGroup(e.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.color4u.buffer]))),e.SetDrawParams(6)}async render(){this.updateSeedAndSampsBuffer(),this.Computation.Compute(!1),this.Computation.CopyBufferToBuffer(this.color4u.buffer,this.denoiserBuffer),this.Computation.Submit(),this.Renderer.Render(),++this.sampsCount%this.denoiserFreq||await this.denoise(),this.sampsCount<this.quartSamps&&requestAnimationFrame(this.draw)}updateSeedAndSampsBuffer(){this.seed[0]=Math.random()*4294967295,this.seed[1]=Math.random()*4294967295,this.seed[2]=Math.random()*4294967295,this.Computation.WriteBuffer(this.seedBuffer,this.seed)}async denoise(){await this.denoiserBuffer.mapAsync(GPUMapMode.READ),this.image.data.set(new Uint32Array(this.denoiserBuffer.getMappedRange())),this.denoiserBuffer.unmap();const e=this.context;this.unet.tileExecute({done:t=>e.putImageData(t,0,0),color:this.image})}createSpheres(){return[{p:[998,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.2,.2]},{p:[-898,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.2,.8]},{p:[50,40.8,1e3],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.8,.2]},{p:[50,40.8,-830],rad:[1e3],e:[0,0,0],refl:[0],c:[0,0,0]},{p:[50,1e3,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[50,-1e3+81.6+4.2,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[27,16.5,47],rad:[16.5],e:[0,0,0],refl:[1],c:[.999,.999,.999]},{p:[73,16.5,78],rad:[16.5],e:[0,0,0],refl:[2],c:[.999,.999,.999]},{p:[50,68.16-.27+74.2,81.6],rad:[60],e:[12,12,12],refl:[0],c:[0,0,0]}]}}const sa=new bT;self.onmessage=async({data:s})=>{const{width:e,height:t}=s;switch(s.action){case"Transfer::WebGPU":const[n,r]=await sa.create(s.canvas,e,t);(e!==n||t!==r)&&self.postMessage({width:n,height:r});break;case"Transfer::2D":return sa.setOutputCanvas(s.canvas,e,t);case"Resize::Window":return sa.resize(e,t)}};self.onerror=console.error;
+            `),constants:{DIMENSION_SIZE:this.workgroupDimension,SAMPLES:4/this.totSamps}});const{seed:i,buffer:o}=r.CreateUniformBuffer("seed");this.color3f=r.CreateStorageBuffer("color3f",this.storageBufferSize*.75),this.denoiserBuffer=r.CreateReadableBuffer(this.storageBufferSize),this.color4u=r.CreateStorageBuffer("color4u",{length:this.storageBufferSize,usage:GPUBufferUsage.COPY_SRC});const{spheres:a,buffer:l}=r.CreateStorageBuffer("spheres",e.length);for(let u=0,c=0;u<e.length;u++,c=u*12)a[u].p.set(e[u].p,c+0),a[u].rad.set(e[u].rad,c+3),a[u].e.set(e[u].e,c+4),a[u].refl.set(e[u].refl,c+7),a[u].c.set(e[u].c,c+8);this.Computation.WriteBuffer(l,a[0].p.buffer),this.seedBuffer=o,this.seed=i,r.SetBindGroups(r.CreateBindGroup(r.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.seedBuffer,this.color3f.buffer,this.color4u.buffer,l]))),this.Computation.Workgroups=[t/this.workgroupDimension,n/this.workgroupDimension]}async createRenderPipeline(){const e=new this.Renderer.Pipeline;await this.Renderer.AddPipeline(e,e.CreateShaderModule([Yc.Resolution,Yc.Quad,kk])),e.SetBindGroups(e.CreateBindGroup(e.CreateBindGroupEntries([this.Renderer.ResolutionBuffer,this.color4u.buffer]))),e.SetDrawParams(6)}async render(){this.updateSeedAndSampsBuffer(),this.Computation.Compute(!1),this.Computation.CopyBufferToBuffer(this.color4u.buffer,this.denoiserBuffer),this.Computation.Submit(),this.Renderer.Render(),++this.sampsCount%this.denoiserFreq||await this.denoise(),this.sampsCount<this.quartSamps&&requestAnimationFrame(this.draw)}updateSeedAndSampsBuffer(){this.seed[0]=Math.random()*4294967295,this.seed[1]=Math.random()*4294967295,this.seed[2]=Math.random()*4294967295,this.Computation.WriteBuffer(this.seedBuffer,this.seed)}async denoise(){await this.denoiserBuffer.mapAsync(GPUMapMode.READ),this.image.data.set(new Uint32Array(this.denoiserBuffer.getMappedRange())),this.denoiserBuffer.unmap();const e=this.context;this.unet.tileExecute({done:t=>e.putImageData(t,0,0),color:this.image})}createSpheres(){return[{p:[998,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.2,.2]},{p:[-898,40.8,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.2,.8]},{p:[50,40.8,1e3],rad:[1e3],e:[0,0,0],refl:[0],c:[.2,.8,.2]},{p:[50,40.8,-830],rad:[1e3],e:[0,0,0],refl:[0],c:[0,0,0]},{p:[50,1e3,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.8,.8,.8]},{p:[50,-1e3+81.6+4.2,81.6],rad:[1e3],e:[0,0,0],refl:[0],c:[.6,.6,.6]},{p:[27,16.5,47],rad:[16.5],e:[0,0,0],refl:[1],c:[.999,.999,.999]},{p:[73,16.5,78],rad:[16.5],e:[0,0,0],refl:[2],c:[.999,.999,.999]},{p:[50,68.16-.27+74.2,81.6],rad:[60],e:[12,12,12],refl:[0],c:[0,0,0]}]}}const sa=new bT;self.onmessage=async({data:s})=>{const{width:e,height:t}=s;switch(s.action){case"Transfer::WebGPU":const[n,r]=await sa.create(s.canvas,e,t);(e!==n||t!==r)&&self.postMessage({width:n,height:r});break;case"Transfer::2D":return sa.setOutputCanvas(s.canvas,e,t);case"Resize::Window":return sa.resize(e,t)}};self.onerror=console.error;
