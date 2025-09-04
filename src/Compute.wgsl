@@ -8,7 +8,7 @@ const REFR: Refl_t = 2;
 
 var<private> rnd: vec3u;
 const M_PI = radians(180);
-const M_1_PI = 1.0 / M_PI;
+// const M_1_PI = 1.0 / M_PI;
 
 override SAMPLES: f32 = 1.0;
 const GAMMA = vec3f(1 / 2.2);
@@ -85,14 +85,14 @@ fn intersect(r: Ray, t: ptr<function, f32>, id: ptr<function, i32>) -> bool
 
 fn radiance(ray: Ray, depth: u32) -> vec3f
 {
-    var E = 1;
+    // var E = 1;
     var t: f32;
     var id = 0;
 
     var r = ray;
     var d = depth;
 
-    var e = vec3f(0);
+    // var e = vec3f(0);
     var cl = vec3f(0);
     var cf = vec3f(1);
 
@@ -108,10 +108,10 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
         var f = obj.c;
 
         let p = max(max(f.x, f.y), f.z);
-        cl += cf * (obj.e * f32(E) + e);
+        cl += cf * (obj.e /* * f32(E) + e */);
 
         d++;
-        if (d > 5 || p == 0)
+        if (d > 5 /* || p == 0 */)
         {
             if (rand() < p) { f *= (1 / p); }
             else { return cl; }
@@ -131,7 +131,7 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
 
             let d = normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2));
 
-            e = vec3f(0);
+            /* e = vec3f(0);
             for (var i = 0; i < i32(SPHERES); i++)
             {
                 let s = spheres[i];
@@ -159,10 +159,10 @@ fn radiance(ray: Ray, depth: u32) -> vec3f
                     let omega = 2 * M_PI * (1 - cos_a_max);
                     e += f * (s.e * dot(l, nl) * omega) * M_1_PI;
                 }
-            }
+            } */
 
             r = Ray(x, d);
-            E = 0;
+            // E = 0;
             continue;
         }
         else if (obj.refl == SPEC)
