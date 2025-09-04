@@ -22,7 +22,7 @@ Moreover, other than running on the GPU instead of the CPU like the original C++
 
 - [oidn-web](https://github.com/pissang/oidn-web) denoising library to produce a clearer output image after only a few samples.
 
-[^1]: _At the moment, 2 canvas elements are used: one with the WebGPU context to run the path tracer (compute shader) and output the result (render pass); and one one with a 2D context to output the result of the image denoiser. I know that a better implementation would be to use only one canvas with a WebGPU context and run a denoiser on top of that, leveraging input and output buffers to avoid the cost of syncing between CPU and GPU as mentioned [here](https://github.com/pissang/oidn-web?tab=readme-ov-file#integrate-into-your-webgpu-pipeline), but that would require to setup an additional normal and albedo buffers since `hdr` and `aux` options are required in the WebGPU pipeline. This is considered to be a nice future improvement._
+[^1]: _At the moment, 2 canvas elements are used: one with the WebGPU context to run the path tracer (compute shader) and output the result (render pass); and another one with a 2D context to output the result of the image denoiser. I know that a better implementation would be to use only one canvas with a WebGPU context and run a denoiser on top of that, leveraging input and output buffers to avoid the cost of syncing between CPU and GPU as mentioned [here](https://github.com/pissang/oidn-web?tab=readme-ov-file#integrate-into-your-webgpu-pipeline), but that would require to setup an additional normal and albedo buffers since `hdr` and `aux` options are required in the WebGPU pipeline. This is considered to be a nice future improvement._
 
 ## Download
 
