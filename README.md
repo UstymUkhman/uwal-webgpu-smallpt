@@ -2,7 +2,7 @@
 
 _WebGPU port of **smallpt**: Global Illumination in 99 lines of C++ by [Kevin Beason](https://kevinbeason.com/)._
 
-[![](./public/preview.jpg)](https://ustymukhman.github.io/uwal-webgpu-smallpt/dist/)
+[![](./public/output.jpg)](https://ustymukhman.github.io/uwal-webgpu-smallpt/dist/)
 
 # Introduction
 
